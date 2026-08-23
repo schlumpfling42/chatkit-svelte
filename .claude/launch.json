@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "playground",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["pnpm@9.0.0", "-C", "C:\\Data\\Projects\\chat-ui-boot\\apps\\playground", "exec", "vite", "dev"],
+      "port": 5180
+    }
+  ]
+}

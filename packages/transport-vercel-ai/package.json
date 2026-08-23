@@ -1,0 +1,29 @@
+{
+  "name": "@chatkit/transport-vercel-ai",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "Adapter for the Vercel AI SDK data stream protocol, normalized into ChatEvent. Proves the transport abstraction holds (M7).",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "vite build --mode lib",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chatkit/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0",
+    "vite-plugin-dts": "^4.0.0",
+    "vitest": "^2.0.0"
+  }
+}

@@ -1,0 +1,59 @@
+[data-chatkit-theme] {
+  /* Color */
+  --ck-color-bg: #ffffff;
+  --ck-color-surface: #f7f7f8;
+  --ck-color-border: #e5e5e7;
+  --ck-color-text: #16161a;
+  --ck-color-text-muted: #6b6b74;
+  --ck-color-accent: #4f46e5;
+  --ck-color-accent-contrast: #ffffff;
+  --ck-color-user-bubble: #4f46e5;
+  --ck-color-user-bubble-text: #ffffff;
+  --ck-color-assistant-bubble: #f2f2f4;
+  --ck-color-assistant-bubble-text: #16161a;
+  --ck-color-error: #d7263d;
+  --ck-color-success: #1a9e5c;
+
+  /* Typography */
+  --ck-font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ck-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --ck-font-size-sm: 0.8125rem;
+  --ck-font-size-base: 0.9375rem;
+  --ck-font-size-lg: 1.0625rem;
+
+  /* Spacing / shape */
+  --ck-radius-sm: 6px;
+  --ck-radius-md: 10px;
+  --ck-radius-lg: 16px;
+  --ck-space-1: 4px;
+  --ck-space-2: 8px;
+  --ck-space-3: 12px;
+  --ck-space-4: 16px;
+  --ck-space-6: 24px;
+
+  /* Motion */
+  --ck-transition-fast: 120ms ease;
+  --ck-transition-base: 200ms ease;
+}
+
+[data-chatkit-theme='dark'] {
+  --ck-color-bg: #16161a;
+  --ck-color-surface: #1e1e22;
+  --ck-color-border: #2c2c31;
+  --ck-color-text: #f2f2f4;
+  --ck-color-text-muted: #9a9aa3;
+  --ck-color-assistant-bubble: #26262b;
+  --ck-color-assistant-bubble-text: #f2f2f4;
+  /* accent/user-bubble/error/success intentionally unchanged for brand consistency */
+}
+
+[data-ck-density='compact'] {
+  --ck-space-1: 2px;
+  --ck-space-2: 4px;
+  --ck-space-3: 6px;
+  --ck-space-4: 8px;
+  --ck-space-6: 12px;
+  --ck-font-size-sm: 0.75rem;
+  --ck-font-size-base: 0.8125rem;
+  --ck-font-size-lg: 0.9375rem;
+}

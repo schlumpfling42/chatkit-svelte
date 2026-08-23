@@ -1,0 +1,27 @@
+{
+  "name": "@chatkit/core",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "Framework-agnostic transport contracts, reducer, plugin host, types, JSON Patch. No Svelte, no DOM.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "vite build --mode lib",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0",
+    "vite-plugin-dts": "^4.0.0",
+    "vitest": "^2.0.0"
+  }
+}
