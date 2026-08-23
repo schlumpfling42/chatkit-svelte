@@ -11,7 +11,9 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "vite build --mode lib",
     "test": "vitest run",
@@ -28,5 +30,14 @@
     "vite-plugin-dts": "^4.0.0",
     "vitest": "^2.0.0",
     "ws": "^8.18.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/schlumpfling42/chatkit-svelte.git",
+    "directory": "packages/transport-agui"
+  },
+  "homepage": "https://github.com/schlumpfling42/chatkit-svelte/tree/main/packages/transport-agui#readme",
+  "bugs": {
+    "url": "https://github.com/schlumpfling42/chatkit-svelte/issues"
   }
 }

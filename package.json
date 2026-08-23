@@ -5,6 +5,14 @@
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@9.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/schlumpfling42/chatkit-svelte.git"
+  },
+  "homepage": "https://github.com/schlumpfling42/chatkit-svelte#readme",
+  "bugs": {
+    "url": "https://github.com/schlumpfling42/chatkit-svelte/issues"
+  },
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
