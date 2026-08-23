@@ -1,6 +1,6 @@
 import FormRenderer from './FormRenderer.svelte';
 import { formArtifactReducer } from './artifact-reducer';
-import type { ChatPlugin } from '@chatkit/core';
+import type { ChatPlugin } from '@chatkit-svelte/core';
 
 export interface FormsPluginOptions {
   /** Accepted, not yet wired — no built-in widget takes a format-keyed component override this milestone. See plan decision 7. */

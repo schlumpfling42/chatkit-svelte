@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BoundedEventQueue } from './event-queue';
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 describe('BoundedEventQueue', () => {
   it('enqueues events in order under capacity', () => {

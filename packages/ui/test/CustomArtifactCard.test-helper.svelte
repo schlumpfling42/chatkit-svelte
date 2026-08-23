@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ArtifactRecord } from '@chatkit/core';
+  import type { ArtifactRecord } from '@chatkit-svelte/core';
 
   interface Props {
     artifact: ArtifactRecord;

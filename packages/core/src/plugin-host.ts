@@ -15,7 +15,7 @@ export interface ToolCall {
 
 export interface MessageRendererRegistration {
   partType: ContentPart['type'];
-  component: unknown; // concrete Svelte component type supplied by @chatkit/svelte consumers (later milestone)
+  component: unknown; // concrete Svelte component type supplied by @chatkit-svelte/svelte consumers (later milestone)
   priority?: number;
 }
 
@@ -25,7 +25,7 @@ export type ToolRendererComponent = unknown;
  * `{ component, props }` when the plugin needs to bake construction-time
  * options into the rendering (e.g. `formsPlugin({ onBeforeSubmit })`,
  * `documentsPlugin({ exportHandlers })`) without a module-level singleton —
- * see the M5 plan's decision 3. `@chatkit/ui`'s `<ArtifactPanel>` is the
+ * see the M5 plan's decision 3. `@chatkit-svelte/ui`'s `<ArtifactPanel>` is the
  * consumer that unwraps whichever shape it finds.
  */
 export type ArtifactRendererComponent = unknown;

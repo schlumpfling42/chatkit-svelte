@@ -10,7 +10,7 @@
 
 ## Design decisions
 
-**1. `PersistenceAdapter`'s type lives in `@chatkit/core`; the two browser-backed implementations live in `@chatkit/svelte`.** `core` has had zero browser-global dependencies since M0 (no `window`, `localStorage`, `indexedDB` — every existing test runs without `jsdom`). `localStoragePersistence`/`indexedDbPersistence` need real browser globals; putting them in `core` would be the first crack in that boundary. `memoryPersistence()` has no such dependency, so it stays in `core` next to the type. This mirrors the existing split where `chat-store.svelte.ts` (not `core`) is already the place that assumes `crypto`/browser environment.
+**1. `PersistenceAdapter`'s type lives in `@chatkit-svelte/core`; the two browser-backed implementations live in `@chatkit-svelte/svelte`.** `core` has had zero browser-global dependencies since M0 (no `window`, `localStorage`, `indexedDB` — every existing test runs without `jsdom`). `localStoragePersistence`/`indexedDbPersistence` need real browser globals; putting them in `core` would be the first crack in that boundary. `memoryPersistence()` has no such dependency, so it stays in `core` next to the type. This mirrors the existing split where `chat-store.svelte.ts` (not `core`) is already the place that assumes `crypto`/browser environment.
 
 **2. IndexedDB adapter uses one object store, not the spec's "separate object stores so large documents don't bloat every read."** That's a real optimization for a mature product; for this milestone, a single `threads` object store (keyPath `id`, storing `{id, title, updatedAt, state}`) is correct and simple. Documented as a deferred optimization, not silently dropped.
 
@@ -24,7 +24,7 @@
 
 **7. Focus coordination between `<ApprovalBar>` and `<Composer>` uses a stable DOM id, not a formal ref-passing API.** `<Composer>`'s text input gets `id="ck-composer-input"`; `<ApprovalBar>` calls `document.getElementById('ck-composer-input')?.focus()` when the last pending approval resolves, and focuses its own first action button when a new approval appears. A prop-drilled/context-based focus-handle API would be more "correct" Svelte architecture but is more machinery than this milestone's actual need justifies — flagged here as the deliberate trade-off, not an oversight.
 
-**8. i18n is threaded through a `store.t(key, params?)` method, not a Svelte context or prop-drilling.** `ChatStore` already carries `config` internally; exposing a bound `t()` off the same object every themed component already reaches via `getChatContext()` needs no new plumbing. `@chatkit/core` ships `defaultMessages` (English) and a small `{param}`-interpolating `translate()` helper; `config.i18n?.messages` is merged over the defaults per-key (spec: "overridable wholesale or per-key"). `dir` is derived from `config.i18n?.locale` against a small hardcoded RTL-locale set and exposed as `store.dir`, applied to `<ChatWindow>`'s root `dir` attribute.
+**8. i18n is threaded through a `store.t(key, params?)` method, not a Svelte context or prop-drilling.** `ChatStore` already carries `config` internally; exposing a bound `t()` off the same object every themed component already reaches via `getChatContext()` needs no new plumbing. `@chatkit-svelte/core` ships `defaultMessages` (English) and a small `{param}`-interpolating `translate()` helper; `config.i18n?.messages` is merged over the defaults per-key (spec: "overridable wholesale or per-key"). `dir` is derived from `config.i18n?.locale` against a small hardcoded RTL-locale set and exposed as `store.dir`, applied to `<ChatWindow>`'s root `dir` attribute.
 
 **9. CLI scope: bare Vite+Svelte target only. SvelteKit scaffolding and the Vercel AI SDK transport option are deferred — neither exists as a working, testable thing to scaffold against yet** (`transport-vercel-ai` is an unbuilt package; a SvelteKit template needs routing conventions this milestone doesn't otherwise touch). The `devtools` plugin checkbox from spec §21 is dropped from the prompt entirely for the same reason — `plugin-devtools` has never been built in this repo, so offering it would generate an app that imports a package that doesn't exist. Plugin choices offered: `file-handling`, `markdown`, `forms`, `documents` (the four real, built, M3/M5 plugin packages), all default-checked. Generation logic (`generateProject(options)`) is a pure, fully-unit-tested function that returns `{path, content}[]`; a thin `bin/create-chatkit.ts` wraps it with a hand-rolled `readline`-based prompt sequence (no new interactive-prompts dependency — the prompt surface is small enough that adding a library isn't justified).
 
@@ -75,7 +75,7 @@ packages/cli/src/index.ts                                        # Task 4 — bi
 
 ### Task 1: Persistence adapters
 
-- [x] **Step 1: `PersistenceAdapter` type + `memoryPersistence()` in `@chatkit/core`**
+- [x] **Step 1: `PersistenceAdapter` type + `memoryPersistence()` in `@chatkit-svelte/core`**
 
 `packages/core/src/persistence.ts`:
 ```ts
@@ -183,16 +183,16 @@ describe('memoryPersistence', () => {
 });
 ```
 
-Run and confirm: `npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/persistence.test.ts` → FAIL (module missing) → implement → PASS (7 tests).
+Run and confirm: `npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/persistence.test.ts` → FAIL (module missing) → implement → PASS (7 tests).
 
-Add `persistence?: PersistenceAdapter` to `packages/core/src/config.ts`'s `ChatConfig`, and `export * from './persistence';` to `packages/core/src/index.ts`. Run full core suite + `tsc --noEmit`; rebuild `@chatkit/core`.
+Add `persistence?: PersistenceAdapter` to `packages/core/src/config.ts`'s `ChatConfig`, and `export * from './persistence';` to `packages/core/src/index.ts`. Run full core suite + `tsc --noEmit`; rebuild `@chatkit-svelte/core`.
 
-- [x] **Step 2: `localStoragePersistence()` in `@chatkit/svelte`**
+- [x] **Step 2: `localStoragePersistence()` in `@chatkit-svelte/svelte`**
 
 `packages/svelte/src/persistence/local-storage.ts`:
 ```ts
-import { deriveTitle } from '@chatkit/core';
-import type { ChatState, PersistenceAdapter, ThreadSummary } from '@chatkit/core';
+import { deriveTitle } from '@chatkit-svelte/core';
+import type { ChatState, PersistenceAdapter, ThreadSummary } from '@chatkit-svelte/core';
 
 export interface LocalStoragePersistenceOptions {
   storage?: Storage;
@@ -256,8 +256,8 @@ export function localStoragePersistence(options: LocalStoragePersistenceOptions 
 ```ts
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { localStoragePersistence } from './local-storage';
-import { initialState } from '@chatkit/core';
-import type { ChatState, Message } from '@chatkit/core';
+import { initialState } from '@chatkit-svelte/core';
+import type { ChatState, Message } from '@chatkit-svelte/core';
 
 function userMessage(text: string): Message {
   return { id: 'm1', role: 'user', parts: [{ type: 'text', text }], createdAt: 0, streaming: false };
@@ -309,14 +309,14 @@ describe('localStoragePersistence', () => {
 
 Run and confirm failure, implement, confirm pass (5 tests).
 
-- [x] **Step 3: `indexedDbPersistence()` in `@chatkit/svelte`**
+- [x] **Step 3: `indexedDbPersistence()` in `@chatkit-svelte/svelte`**
 
 Add `fake-indexeddb` as a devDependency (`^6.0.0`) — a real, widely-used IndexedDB polyfill for exactly this test scenario (jsdom has no native IndexedDB).
 
 `packages/svelte/src/persistence/indexed-db.ts`:
 ```ts
-import { deriveTitle } from '@chatkit/core';
-import type { ChatState, PersistenceAdapter, ThreadSummary } from '@chatkit/core';
+import { deriveTitle } from '@chatkit-svelte/core';
+import type { ChatState, PersistenceAdapter, ThreadSummary } from '@chatkit-svelte/core';
 
 export interface IndexedDbPersistenceOptions {
   indexedDB?: IDBFactory;
@@ -386,8 +386,8 @@ export function indexedDbPersistence(options: IndexedDbPersistenceOptions = {}):
 import { describe, expect, it, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
 import { indexedDbPersistence } from './indexed-db';
-import { initialState } from '@chatkit/core';
-import type { ChatState, Message } from '@chatkit/core';
+import { initialState } from '@chatkit-svelte/core';
+import type { ChatState, Message } from '@chatkit-svelte/core';
 
 function userMessage(text: string): Message {
   return { id: 'm1', role: 'user', parts: [{ type: 'text', text }], createdAt: 0, streaming: false };
@@ -422,7 +422,7 @@ describe('indexedDbPersistence', () => {
 });
 ```
 
-Each test uses a fresh random `dbName` to avoid cross-test IndexedDB state leaking (vitest doesn't tear down fake-indexeddb's global registry between tests in the same file automatically). Run and confirm failure, implement, confirm pass (4 tests). Export both new adapters from `packages/svelte/src/index.ts`. Rebuild `@chatkit/svelte`.
+Each test uses a fresh random `dbName` to avoid cross-test IndexedDB state leaking (vitest doesn't tear down fake-indexeddb's global registry between tests in the same file automatically). Run and confirm failure, implement, confirm pass (4 tests). Export both new adapters from `packages/svelte/src/index.ts`. Rebuild `@chatkit-svelte/svelte`.
 
 - [x] **Step 4: Wire persistence into `createChatStore`**
 
@@ -460,7 +460,7 @@ if (config.persistence) {
 ```
 And add `clearTimeout(saveTimer);` to the top of `dispose()`, before `disposed = true;` — a pending debounced save firing after teardown would call `saveThread` on a disposed store's last-known state, harmless but pointless; clearing it is cheap and avoids the dangling timer entirely.
 
-Add these tests to `packages/svelte/src/chat-store.test.ts` (new `describe('persistence', ...)` block; needs `PersistenceAdapter` added to the `@chatkit/core` type import and `vi.useFakeTimers()`/`vi.advanceTimersByTimeAsync()`):
+Add these tests to `packages/svelte/src/chat-store.test.ts` (new `describe('persistence', ...)` block; needs `PersistenceAdapter` added to the `@chatkit-svelte/core` type import and `vi.useFakeTimers()`/`vi.advanceTimersByTimeAsync()`):
 ```ts
 describe('persistence', () => {
   function fakeAdapter(initial?: ChatState): PersistenceAdapter & { saved: ChatState[] } {
@@ -536,7 +536,7 @@ describe('persistence', () => {
 });
 ```
 
-Run and confirm the first two fail (`store.messages` stays empty; `saved` never grows) before the Step 4 code exists, then pass after. Run the full `@chatkit/svelte` suite + `svelte-check`. Rebuild `@chatkit/svelte`.
+Run and confirm the first two fail (`store.messages` stays empty; `saved` never grows) before the Step 4 code exists, then pass after. Run the full `@chatkit-svelte/svelte` suite + `svelte-check`. Rebuild `@chatkit-svelte/svelte`.
 
 ---
 
@@ -653,7 +653,7 @@ Switch `packages/ui/vite.config.ts`'s `build.lib.entry` from a single string to 
       formats: ['es'],
     },
 ```
-(`fileName` is dropped — Vite derives per-entry output names from the entry object's keys once `entry` is an object.) Run `npx pnpm@9.0.0 --filter @chatkit/ui build` and confirm both `dist/index.js` and `dist/tailwind-preset.js` exist.
+(`fileName` is dropped — Vite derives per-entry output names from the entry object's keys once `entry` is an object.) Run `npx pnpm@9.0.0 --filter @chatkit-svelte/ui build` and confirm both `dist/index.js` and `dist/tailwind-preset.js` exist.
 
 - [x] **Step 4: WCAG AA contrast audit**
 
@@ -720,13 +720,13 @@ describe('default theme meets WCAG AA (4.5:1) for text/background token pairs', 
 ```
 If any of these fail against the actual current token values, that's a real defect this audit is supposed to catch — fix the failing token value in `tokens.css` (not the test) and re-run, per spec §16's "audited as part of CI" intent. Run once fully; if all pass, no `tokens.css` color changes are needed.
 
-Export `chatkitTailwindPreset` and `contrastRatio` from `packages/ui/src/index.ts`. Run the full `@chatkit/ui` suite + `svelte-check`. Rebuild.
+Export `chatkitTailwindPreset` and `contrastRatio` from `packages/ui/src/index.ts`. Run the full `@chatkit-svelte/ui` suite + `svelte-check`. Rebuild.
 
 ---
 
 ### Task 3: Accessibility + Internationalization
 
-- [x] **Step 1: `I18nConfig` + default message table in `@chatkit/core`**
+- [x] **Step 1: `I18nConfig` + default message table in `@chatkit-svelte/core`**
 
 `packages/core/src/i18n.ts`:
 ```ts
@@ -804,7 +804,7 @@ describe('directionForLocale', () => {
 });
 ```
 
-Run, confirm failure then pass (6 tests). Add `i18n?: I18nConfig` to `ChatConfig` in `config.ts`; `export * from './i18n';` in `index.ts`. Rebuild `@chatkit/core`.
+Run, confirm failure then pass (6 tests). Add `i18n?: I18nConfig` to `ChatConfig` in `config.ts`; `export * from './i18n';` in `index.ts`. Rebuild `@chatkit-svelte/core`.
 
 - [x] **Step 2: `store.t()` / `store.dir` on `createChatStore`**
 
@@ -815,7 +815,7 @@ Add to `packages/svelte/src/chat-store.svelte.ts` (near the other getters on the
   }
   const dir = directionForLocale(config.i18n?.locale);
 ```
-with `translate`/`directionForLocale` added to the `@chatkit/core` import, and `t`/`get dir() { return dir; }` added to the returned object.
+with `translate`/`directionForLocale` added to the `@chatkit-svelte/core` import, and `t`/`get dir() { return dir; }` added to the returned object.
 
 Add tests to `chat-store.test.ts`:
 ```ts
@@ -846,7 +846,7 @@ describe('i18n', () => {
   });
 });
 ```
-Run full `@chatkit/svelte` suite + `svelte-check`; rebuild.
+Run full `@chatkit-svelte/svelte` suite + `svelte-check`; rebuild.
 
 - [x] **Step 3: `<ChatWindow>` `dir` attribute**
 
@@ -939,7 +939,7 @@ it('announces immediately on TEXT_MESSAGE_END without waiting for the debounce',
 ```
 (Existing `MessageList.test.ts` in this repo renders `MessageList` directly through `TestHarness`/`ChatWindow` fixtures already established in M2/M3 — use whichever harness component the file already imports; the test names above are illustrative of the two cases to cover, not a literal drop-in requiring a new harness file.)
 
-Run, confirm failure then pass. Run full `@chatkit/ui` suite + `svelte-check`.
+Run, confirm failure then pass. Run full `@chatkit-svelte/ui` suite + `svelte-check`.
 
 - [x] **Step 5: i18n strings + focus management in `Composer.svelte`**
 
@@ -995,11 +995,11 @@ Replace all five hardcoded button labels with `store.t(...)` calls (`approvalBar
 ```
 with `bind:this={barEl}` added to the root `<div class="ck-approval-bar" ...>`. Add a test: approving the only pending call moves focus to the composer input (given the composer is present in the same rendered tree — use the existing `TestHarness`, which already renders the full `ChatWindow`).
 
-- [x] **Step 7: `role="form"` + i18n in `FormRenderer.svelte`** (`@chatkit/plugin-forms`)
+- [x] **Step 7: `role="form"` + i18n in `FormRenderer.svelte`** (`@chatkit-svelte/plugin-forms`)
 
 Explicit `role="form"` on the `<form>` element turned out to be a no-op worth *not* adding: Svelte's own `a11y_no_redundant_roles` check flags it, correctly — a native `<form>` element already carries an implicit ARIA role of `form`, so the explicit attribute adds nothing and would be the only svelte-check warning in the whole milestone. Left out; the native semantics already satisfy spec §16's intent. Replaced the hardcoded `data.submitLabel ?? 'Submit'` fallback with `data.submitLabel ?? store.t('form.submit')`, and the hardcoded validation message inside `validateField`'s required check (`packages/plugin-forms/src/validate.ts`) — since `validate.ts` is a plain function with no store access, its literal English strings stay as the ultimate fallback but `FormRenderer.svelte` now prefers `store.t('form.validation.required')` **only for the required-field case** when re-rendering the error (a full per-validation-rule i18n pass — minLength/pattern/min/max message keys too — is straightforward but not done here; noted below as a deferred follow-up, matching this session's established practice of naming rather than silently limiting scope).
 
-- [x] **Step 8: i18n in `DocumentCanvas.svelte`** (`@chatkit/plugin-documents`)
+- [x] **Step 8: i18n in `DocumentCanvas.svelte`** (`@chatkit-svelte/plugin-documents`)
 
 Replace `Edit`/`Save`/`Cancel`/`Export {format}` literals with `store.t('document.edit')` etc., using `store.t('document.export', { format })` for the per-format export buttons.
 
@@ -1018,7 +1018,7 @@ Run the full test suite + `svelte-check`/`tsc` for `core`, `svelte`, `ui`, `plug
 {
   "name": "create-chatkit",
   "version": "0.0.0",
-  "description": "npx create-chatkit my-chat-app — scaffolds a bare Vite+Svelte app wired to @chatkit/svelte + @chatkit/ui with chosen plugins/theme. SvelteKit scaffolding is not yet supported.",
+  "description": "npx create-chatkit my-chat-app — scaffolds a bare Vite+Svelte app wired to @chatkit-svelte/svelte + @chatkit-svelte/ui with chosen plugins/theme. SvelteKit scaffolding is not yet supported.",
   "type": "module",
   "bin": {
     "create-chatkit": "./dist/index.js"
@@ -1087,13 +1087,13 @@ describe('generateProject', () => {
   it('adds a dependency and an import for each selected plugin', () => {
     const files = generateProject({ appName: 'app', plugins: ['markdown', 'forms'], theme: 'light' });
     const pkg = JSON.parse(files.find((f) => f.path === 'package.json')!.content);
-    expect(pkg.dependencies['@chatkit/plugin-markdown']).toBeDefined();
-    expect(pkg.dependencies['@chatkit/plugin-forms']).toBeDefined();
-    expect(pkg.dependencies['@chatkit/plugin-documents']).toBeUndefined();
+    expect(pkg.dependencies['@chatkit-svelte/plugin-markdown']).toBeDefined();
+    expect(pkg.dependencies['@chatkit-svelte/plugin-forms']).toBeDefined();
+    expect(pkg.dependencies['@chatkit-svelte/plugin-documents']).toBeUndefined();
 
     const configFile = files.find((f) => f.path === 'src/chatkit.config.ts')!.content;
-    expect(configFile).toContain("import { markdownPlugin } from '@chatkit/plugin-markdown'");
-    expect(configFile).toContain("import { formsPlugin } from '@chatkit/plugin-forms'");
+    expect(configFile).toContain("import { markdownPlugin } from '@chatkit-svelte/plugin-markdown'");
+    expect(configFile).toContain("import { formsPlugin } from '@chatkit-svelte/plugin-forms'");
     expect(configFile).not.toContain('plugin-documents');
   });
 
@@ -1221,10 +1221,10 @@ export interface GeneratedFile {
 }
 
 const PLUGIN_PACKAGES: Record<PluginChoice, { pkg: string; importName: string; factory: string }> = {
-  'file-handling': { pkg: '@chatkit/plugin-file-handling', importName: 'fileHandlingPlugin', factory: 'fileHandlingPlugin({ upload: async (file) => ({ url: URL.createObjectURL(file) }) })' },
-  markdown: { pkg: '@chatkit/plugin-markdown', importName: 'markdownPlugin', factory: 'markdownPlugin()' },
-  forms: { pkg: '@chatkit/plugin-forms', importName: 'formsPlugin', factory: 'formsPlugin()' },
-  documents: { pkg: '@chatkit/plugin-documents', importName: 'documentsPlugin', factory: 'documentsPlugin()' },
+  'file-handling': { pkg: '@chatkit-svelte/plugin-file-handling', importName: 'fileHandlingPlugin', factory: 'fileHandlingPlugin({ upload: async (file) => ({ url: URL.createObjectURL(file) }) })' },
+  markdown: { pkg: '@chatkit-svelte/plugin-markdown', importName: 'markdownPlugin', factory: 'markdownPlugin()' },
+  forms: { pkg: '@chatkit-svelte/plugin-forms', importName: 'formsPlugin', factory: 'formsPlugin()' },
+  documents: { pkg: '@chatkit-svelte/plugin-documents', importName: 'documentsPlugin', factory: 'documentsPlugin()' },
 };
 
 function tokensCss(): string {
@@ -1251,10 +1251,10 @@ export function generateProject(options: GenerateProjectOptions): GeneratedFile[
     },
     dependencies: {
       svelte: '^5.0.0',
-      '@chatkit/core': '^0.0.0',
-      '@chatkit/svelte': '^0.0.0',
-      '@chatkit/ui': '^0.0.0',
-      '@chatkit/transport-agui': '^0.0.0',
+      '@chatkit-svelte/core': '^0.0.0',
+      '@chatkit-svelte/svelte': '^0.0.0',
+      '@chatkit-svelte/ui': '^0.0.0',
+      '@chatkit-svelte/transport-agui': '^0.0.0',
       ...Object.fromEntries(pluginEntries.map((e) => [e.pkg, '^0.0.0'])),
     },
     devDependencies: {
@@ -1301,9 +1301,9 @@ mount(App, { target: document.getElementById('app')! });
       : '';
 
   const appSvelte = `<script lang="ts">
-  import { ChatProvider } from '@chatkit/svelte';
-  import { ChatWindow } from '@chatkit/ui';
-  import { createAguiTransport } from '@chatkit/transport-agui';
+  import { ChatProvider } from '@chatkit-svelte/svelte';
+  import { ChatWindow } from '@chatkit-svelte/ui';
+  import { createAguiTransport } from '@chatkit-svelte/transport-agui';
   import { plugins } from './chatkit.config';
 ${themeScript}
   const config = {

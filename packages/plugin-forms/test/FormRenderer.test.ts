@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import TestHarness from './TestHarness.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ArtifactRecord } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ArtifactRecord } from '@chatkit-svelte/core';
 import type { FormArtifactData } from '../src/types';
 
 function makeArtifact(data: Partial<FormArtifactData>, status: ArtifactRecord['status'] = 'draft'): ArtifactRecord {

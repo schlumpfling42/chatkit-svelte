@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateForm } from '../src/validate';
-import type { JSONSchema } from '@chatkit/core';
+import type { JSONSchema } from '@chatkit-svelte/core';
 
 describe('validateForm', () => {
   it('reports a required field that is missing as an error', () => {

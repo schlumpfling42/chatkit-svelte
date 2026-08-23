@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDevtoolsLog } from '../src/log.svelte';
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 describe('createDevtoolsLog', () => {
   it('starts empty', () => {

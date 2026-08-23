@@ -1,5 +1,5 @@
 {
-  "name": "@chatkit/plugin-documents",
+  "name": "@chatkit-svelte/plugin-documents",
   "version": "0.1.0",
   "license": "MIT",
   "description": "Agent-authored document/artifact canvas (chatkit.document.* CUSTOM events): markdown mode first, ProseMirror richtext mode second.",
@@ -25,9 +25,9 @@
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*",
-    "@chatkit/svelte": "workspace:*",
-    "@chatkit/plugin-markdown": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*",
+    "@chatkit-svelte/svelte": "workspace:*",
+    "@chatkit-svelte/plugin-markdown": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/package": "^2.5.0",

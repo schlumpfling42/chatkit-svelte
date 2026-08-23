@@ -47,18 +47,18 @@ piece meant for visual tweaking per-project.
 │  App (consumer)                                                   │
 │  <ChatProvider config={...}> <ChatWindow /> </ChatProvider>       │
 ├───────────────────────────────────────────────────────────────────┤
-│  UI Layer (@chatkit/ui)                                            │
+│  UI Layer (@chatkit-svelte/ui)                                            │
 │  Themed components + headless primitives, snippet-based render     │
 │  slots for messages / tools / attachments / forms / documents      │
 ├───────────────────────────────────────────────────────────────────┤
-│  Plugin Runtime (@chatkit/core → PluginHost)                       │
+│  Plugin Runtime (@chatkit-svelte/core → PluginHost)                       │
 │  Lifecycle hooks, capability registration, extension-point registry │
 ├───────────────────────────────────────────────────────────────────┤
-│  Session/State Layer (@chatkit/core → ChatStore)                   │
+│  Session/State Layer (@chatkit-svelte/core → ChatStore)                   │
 │  Runes-based reactive store: threads, messages, run state,          │
 │  shared agent state (snapshot+JSON Patch), tool calls, artifacts    │
 ├───────────────────────────────────────────────────────────────────┤
-│  Transport Layer (@chatkit/core → ChatTransport interface)         │
+│  Transport Layer (@chatkit-svelte/core → ChatTransport interface)         │
 │  AG-UI SSE/WebSocket client (default), pluggable adapters          │
 ├───────────────────────────────────────────────────────────────────┤
 │  Wire Protocols: AG-UI (default) │ Vercel AI SDK │ custom          │
@@ -476,9 +476,9 @@ export function createPluginHost(plugins: ChatPlugin[]) {
 ## 7. Svelte 5 State Layer (`packages/svelte/src/chat-store.svelte.ts`)
 
 ```ts
-import { reduceEvent, initialState } from '@chatkit/core';
-import { createPluginHost } from '@chatkit/core';
-import { createTransport } from '@chatkit/core';
+import { reduceEvent, initialState } from '@chatkit-svelte/core';
+import { createPluginHost } from '@chatkit-svelte/core';
+import { createTransport } from '@chatkit-svelte/core';
 
 export function createChatStore(config: ChatConfig) {
   let state = $state(initialState(config.initialState));
@@ -604,9 +604,9 @@ several concurrent agent panels, each with its own `threadId`).
 
 Two tiers:
 
-1. **Headless primitives** (`@chatkit/svelte`): `getChatContext()`,
+1. **Headless primitives** (`@chatkit-svelte/svelte`): `getChatContext()`,
    `useThread(id)` — no markup, no CSS. Lets consumers build fully custom UI.
-2. **Themed components** (`@chatkit/ui`): `<ChatWindow>`, `<MessageList>`,
+2. **Themed components** (`@chatkit-svelte/ui`): `<ChatWindow>`, `<MessageList>`,
    `<Composer>`, `<ToolCallCard>`, `<ApprovalBar>`, `<ThreadSidebar>`,
    `<FormRenderer>`, `<DocumentCanvas>` (§14). Built from the primitives,
    using **Svelte 5 snippets** for every customizable region:
@@ -630,7 +630,7 @@ Two tiers:
 
 Every themed component accepts a `class` / `style` override and reads only
 from the CSS variable tokens defined in §15 — no hardcoded colors, spacing
-constants, or font stacks anywhere in `@chatkit/ui`'s source. This is what
+constants, or font stacks anywhere in `@chatkit-svelte/ui`'s source. This is what
 makes the package "tweak, don't rewrite": a consumer can restyle the entire
 surface by overriding the token set in one CSS file.
 
@@ -837,7 +837,7 @@ user-editable in place.
 - Markdown documents: a lightweight editable text area with a live-preview
   toggle (not a full WYSIWYG in v1 — keeps the dependency footprint small).
 - Richtext documents: a minimal ProseMirror-based editor instance
-  (`@chatkit/plugin-documents` depends on `prosemirror-*` directly rather than
+  (`@chatkit-svelte/plugin-documents` depends on `prosemirror-*` directly rather than
   pulling in a larger editor framework) supporting headings, lists, bold/
   italic, tables, and links — the intersection of "common agent-authored
   document" needs, not a general word processor.
@@ -901,7 +901,7 @@ const config: ChatConfig = {
 
 ## 15. Styling & Theming (the intended "tweak this" surface)
 
-Everything visual in `@chatkit/ui` reads from a single CSS custom-property
+Everything visual in `@chatkit-svelte/ui` reads from a single CSS custom-property
 namespace, set on a root wrapper (`<ChatProvider>` applies `data-chatkit-theme`
 and injects the default token file):
 
@@ -956,7 +956,7 @@ and injects the default token file):
 }
 ```
 
-- **Tailwind preset** (optional, `@chatkit/ui/tailwind-preset`): maps the same
+- **Tailwind preset** (optional, `@chatkit-svelte/ui/tailwind-preset`): maps the same
   tokens to Tailwind theme values, for consumers who want `class="bg-ck-surface"`-
   style utilities instead of raw CSS vars. Never required.
 - **Per-component style overrides**: every themed component accepts `class`
@@ -1006,7 +1006,7 @@ interface I18nConfig {
 }
 ```
 
-All user-facing strings in `@chatkit/ui` (button labels, empty states, error
+All user-facing strings in `@chatkit-svelte/ui` (button labels, empty states, error
 messages, form validation messages) are pulled from a single default
 `en`-locale message table with stable keys, overridable wholesale or
 per-key. RTL handled via `dir` attribute propagation, not mirrored CSS
@@ -1099,4 +1099,4 @@ the default token CSS file copied in (editable) rather than hidden in
 
 - How much of AG-UI's emerging declarative generative-UI spec to adopt natively once it stabilizes, vs. keep the hand-rolled forms/documents artifacts as the permanent approach.
 - Richtext document collaborative editing (multi-user) — v2 candidate, would likely mean adopting Yjs and rethinking the artifact version model.
-- Whether `docx`/`pdf` export should eventually ship an *optional* first-party handler package (`@chatkit/plugin-documents-export`) instead of always requiring consumer-supplied callbacks, once a lightweight enough implementation is found.
+- Whether `docx`/`pdf` export should eventually ship an *optional* first-party handler package (`@chatkit-svelte/plugin-documents-export`) instead of always requiring consumer-supplied callbacks, once a lightweight enough implementation is found.

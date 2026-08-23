@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import 'fake-indexeddb/auto';
 import { indexedDbPersistence } from '../../src/persistence/indexed-db';
-import { initialState } from '@chatkit/core';
-import type { ChatState, Message } from '@chatkit/core';
+import { initialState } from '@chatkit-svelte/core';
+import type { ChatState, Message } from '@chatkit-svelte/core';
 
 function userMessage(text: string): Message {
   return { id: 'm1', role: 'user', parts: [{ type: 'text', text }], createdAt: 0, streaming: false };

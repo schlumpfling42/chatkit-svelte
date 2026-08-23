@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getChatContext } from '@chatkit/svelte';
+  import { getChatContext } from '@chatkit-svelte/svelte';
   import type { Component } from 'svelte';
 
   interface Props {

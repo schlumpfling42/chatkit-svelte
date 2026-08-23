@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { formArtifactReducer } from '../src/artifact-reducer';
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 describe('formArtifactReducer', () => {
   it('matches chatkit.form.snapshot and chatkit.form.result CUSTOM events only', () => {

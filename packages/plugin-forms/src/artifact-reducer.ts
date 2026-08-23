@@ -1,4 +1,4 @@
-import type { ArtifactKind, ArtifactRecord, ChatEvent } from '@chatkit/core';
+import type { ArtifactKind, ArtifactRecord, ChatEvent } from '@chatkit-svelte/core';
 import type { FormArtifactData, FormResultPayload, FormSnapshotPayload } from './types';
 
 function isFormSnapshotPayload(payload: unknown): payload is FormSnapshotPayload {

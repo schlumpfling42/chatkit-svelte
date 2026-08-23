@@ -1,4 +1,4 @@
-import type { ArtifactRecord } from '@chatkit/core';
+import type { ArtifactRecord } from '@chatkit-svelte/core';
 
 export type ExportFormat = 'md' | 'txt' | 'docx' | 'pdf';
 

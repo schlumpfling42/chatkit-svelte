@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { exportFixture } from '../src/export-fixture';
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 describe('exportFixture', () => {
   it("serializes the event log as pretty-printed JSON matching createFixtureTransport's expected input shape", () => {

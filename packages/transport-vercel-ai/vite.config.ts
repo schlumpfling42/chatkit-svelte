@@ -11,7 +11,7 @@ export default defineConfig({
       fileName: 'index',
     },
     rollupOptions: {
-      external: ['@chatkit/core'],
+      external: ['@chatkit-svelte/core'],
     },
   },
   test: {

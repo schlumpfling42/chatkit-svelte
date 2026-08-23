@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { ChatProvider } from '@chatkit/svelte';
+  import { ChatProvider } from '@chatkit-svelte/svelte';
   import ChatWindow from '../src/ChatWindow.svelte';
-  import type { ChatConfig } from '@chatkit/core';
+  import type { ChatConfig } from '@chatkit-svelte/core';
 
   interface Props {
     config: ChatConfig;

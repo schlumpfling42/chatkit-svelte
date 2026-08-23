@@ -3,9 +3,9 @@
   import Composer from './Composer.svelte';
   import ApprovalBar from './ApprovalBar.svelte';
   import ArtifactPanel from './ArtifactPanel.svelte';
-  import { getChatContext } from '@chatkit/svelte';
+  import { getChatContext } from '@chatkit-svelte/svelte';
   import type { Snippet } from 'svelte';
-  import type { Message } from '@chatkit/core';
+  import type { Message } from '@chatkit-svelte/core';
 
   interface Props {
     message?: Snippet<[Message]>;

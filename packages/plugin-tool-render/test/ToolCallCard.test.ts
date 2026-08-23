@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import ToolCallCard from '../src/ToolCallCard.svelte';
-import type { ContentPart } from '@chatkit/core';
+import type { ContentPart } from '@chatkit-svelte/core';
 
 function toolCall(overrides: Partial<ContentPart & { type: 'tool_call' }> = {}): ContentPart & { type: 'tool_call' } {
   return {

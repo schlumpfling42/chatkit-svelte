@@ -12,11 +12,11 @@
 
 ## Design decisions this plan has to make (spec §14 is descriptive prose + one reference interface block, not exhaustive wire/API contracts)
 
-**1. Where artifact-reducer routing actually happens.** `reducer.ts`'s `CUSTOM` case has been a documented no-op since M0 ("delegated to registered ArtifactReducers by the plugin host — a later milestone"). `core` has no knowledge of plugins, so this routing belongs in `@chatkit/svelte`'s `chat-store.svelte.ts`, next to where `pluginHost.registry` already lives. A shared `applyEvent(event)` helper replaces the current bare `state = reduceEvent(state, event)` call in `consumeStream`: it runs the reducer, then — for `CUSTOM` events only — finds the first registered `ArtifactReducer` (across all kinds, flattened) whose `.matches(event)` is true and folds its `.apply(state.artifacts, event)` result into state.
+**1. Where artifact-reducer routing actually happens.** `reducer.ts`'s `CUSTOM` case has been a documented no-op since M0 ("delegated to registered ArtifactReducers by the plugin host — a later milestone"). `core` has no knowledge of plugins, so this routing belongs in `@chatkit-svelte/svelte`'s `chat-store.svelte.ts`, next to where `pluginHost.registry` already lives. A shared `applyEvent(event)` helper replaces the current bare `state = reduceEvent(state, event)` call in `consumeStream`: it runs the reducer, then — for `CUSTOM` events only — finds the first registered `ArtifactReducer` (across all kinds, flattened) whose `.matches(event)` is true and folds its `.apply(state.artifacts, event)` result into state.
 
-**2. The chat store needs a generic, artifact-agnostic way for a renderer component to push a local event.** Spec's prose says `store.submitForm(artifactId, values)` — but adding form-shaped methods to the generic core store would mean `@chatkit/svelte` importing form-specific types from a plugin package, inverting the dependency direction every other plugin in this codebase respects (plugins depend on `svelte`/`core`, never the reverse). Instead, this plan exposes one new generic method on the public `ChatStore`: `dispatch(event: ChatEvent): void` (delegating to the same `applyEvent` helper `PluginContext.dispatch` already uses internally). `FormRenderer`/`DocumentCanvas` use it to apply a local, synchronous status change (e.g. `chatkit.form.result` flips the artifact to `'submitted'` immediately, without waiting on a round trip), then use the existing `store.sendMessage()` to actually deliver the result to the backend as a `custom` content part — reusing two already-generic primitives instead of inventing form/document-specific store methods.
+**2. The chat store needs a generic, artifact-agnostic way for a renderer component to push a local event.** Spec's prose says `store.submitForm(artifactId, values)` — but adding form-shaped methods to the generic core store would mean `@chatkit-svelte/svelte` importing form-specific types from a plugin package, inverting the dependency direction every other plugin in this codebase respects (plugins depend on `svelte`/`core`, never the reverse). Instead, this plan exposes one new generic method on the public `ChatStore`: `dispatch(event: ChatEvent): void` (delegating to the same `applyEvent` helper `PluginContext.dispatch` already uses internally). `FormRenderer`/`DocumentCanvas` use it to apply a local, synchronous status change (e.g. `chatkit.form.result` flips the artifact to `'submitted'` immediately, without waiting on a round trip), then use the existing `store.sendMessage()` to actually deliver the result to the backend as a `custom` content part — reusing two already-generic primitives instead of inventing form/document-specific store methods.
 
-**3. `PluginRegistry.artifactRenderers`'s value shape needs to support renderer options, or `formsPlugin(options)`/`documentsPlugin(options)` can't reach their own components.** Nothing has consumed `artifactRenderers` before this milestone (typed since M0, never read), so this plan gets to define its actual runtime contract. A naive module-level singleton for plugin options (the initially-tempting shortcut) would break spec §8's own explicitly-stated multi-instance use case (a dashboard with several concurrent `<ChatWindow>`s, each independently configured) — two `formsPlugin({...})` calls with different `onBeforeSubmit` callbacks would silently clobber each other. Instead, a registered `artifactRenderers[kind]` entry may now be **either** a bare component **or** `{ component, props }`; the new `<ArtifactPanel>` consumer (built in this plan, `@chatkit/ui`) unwraps whichever shape it finds and spreads `props` onto the rendered component alongside `artifact`. This is a purely additive contract change (the type was already `unknown`) that lets `formsPlugin(options)`/`documentsPlugin(options)` bake their options into `props` at construction time — correct per-instance, no singleton.
+**3. `PluginRegistry.artifactRenderers`'s value shape needs to support renderer options, or `formsPlugin(options)`/`documentsPlugin(options)` can't reach their own components.** Nothing has consumed `artifactRenderers` before this milestone (typed since M0, never read), so this plan gets to define its actual runtime contract. A naive module-level singleton for plugin options (the initially-tempting shortcut) would break spec §8's own explicitly-stated multi-instance use case (a dashboard with several concurrent `<ChatWindow>`s, each independently configured) — two `formsPlugin({...})` calls with different `onBeforeSubmit` callbacks would silently clobber each other. Instead, a registered `artifactRenderers[kind]` entry may now be **either** a bare component **or** `{ component, props }`; the new `<ArtifactPanel>` consumer (built in this plan, `@chatkit-svelte/ui`) unwraps whichever shape it finds and spreads `props` onto the rendered component alongside `artifact`. This is a purely additive contract change (the type was already `unknown`) that lets `formsPlugin(options)`/`documentsPlugin(options)` bake their options into `props` at construction time — correct per-instance, no singleton.
 
 **4. `chatkit.document.delta`'s payload, for markdown-format documents.** Spec describes it generically as "RFC 6902 over the document's JSON representation" — that phrasing is written for richtext's structured ProseMirror doc model (deferred here). Applying RFC 6902 patch *operations* to a bare markdown *string* doesn't have an obvious mapping. Scoped for markdown mode only: `chatkit.document.delta`'s payload is `{ artifactId, append: string }` — a plain text append, mirroring how `TEXT_MESSAGE_CONTENT` streams chat text. Full JSON-Patch deltas are reserved for richtext mode once it's built.
 
@@ -28,7 +28,7 @@
 
 **8. `onBeforeSubmit` IS wired** (cheap, high-value, no missing infrastructure) — called with the form's local values before `dispatch`/`sendMessage`, via the `props`-passing mechanism from decision 3.
 
-**9. Document export.** `exportDocument(artifact, format, handlers)` is a plain exported function from `@chatkit/plugin-documents` (not a store method, for the same reasoning as decision 2 — `core`/`svelte` stay artifact-agnostic). `md`/`txt` return `artifact.data.content` directly; `docx`/`pdf` call a consumer-supplied handler from `documentsPlugin({ exportHandlers })` (threaded via decision 3's `props`) or throw a clear "register an export handler" error, per spec §14.3.
+**9. Document export.** `exportDocument(artifact, format, handlers)` is a plain exported function from `@chatkit-svelte/plugin-documents` (not a store method, for the same reasoning as decision 2 — `core`/`svelte` stay artifact-agnostic). `md`/`txt` return `artifact.data.content` directly; `docx`/`pdf` call a consumer-supplied handler from `documentsPlugin({ exportHandlers })` (threaded via decision 3's `props`) or throw a clear "register an export handler" error, per spec §14.3.
 
 ---
 
@@ -58,7 +58,7 @@ packages/plugin-documents/
 
 ---
 
-### Task 1: Artifact-reducer routing + `store.dispatch()` in `@chatkit/svelte`
+### Task 1: Artifact-reducer routing + `store.dispatch()` in `@chatkit-svelte/svelte`
 
 **Files:**
 - Modify: `packages/svelte/src/chat-store.svelte.ts`
@@ -66,7 +66,7 @@ packages/plugin-documents/
 
 - [x] **Step 1: Write the failing tests**
 
-Add to `packages/svelte/src/chat-store.test.ts` (needs `ArtifactReducer` added to the `@chatkit/core` type import):
+Add to `packages/svelte/src/chat-store.test.ts` (needs `ArtifactReducer` added to the `@chatkit-svelte/core` type import):
 
 ```ts
 describe('artifact reducer routing', () => {
@@ -138,7 +138,7 @@ describe('artifact reducer routing', () => {
 - [x] **Step 2: Run and confirm failure**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/svelte exec vitest run src/chat-store.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte exec vitest run src/chat-store.test.ts
 ```
 Expected: FAIL — `store.dispatch` is not a function; artifacts never populate.
 
@@ -196,20 +196,20 @@ Add `dispatch` to the returned object, alongside the other public methods:
 - [x] **Step 4: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/svelte exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/svelte exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte exec svelte-check --tsconfig ./tsconfig.json
 ```
 Expected: PASS — 22 tests (19 existing + 3 new), 0 svelte-check errors/warnings.
 
-- [x] **Step 5: Rebuild `@chatkit/svelte`** (its `dist/` is what every downstream package/test resolves `@chatkit/svelte` from)
+- [x] **Step 5: Rebuild `@chatkit-svelte/svelte`** (its `dist/` is what every downstream package/test resolves `@chatkit-svelte/svelte` from)
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/svelte build
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte build
 ```
 
 ---
 
-### Task 2: `<ArtifactPanel>` in `@chatkit/ui`
+### Task 2: `<ArtifactPanel>` in `@chatkit-svelte/ui`
 
 The generic consumer of `registry.artifactRenderers` — resolves either registration shape from decision 3 above and renders each artifact full-width, between the message list and the approval bar.
 
@@ -227,8 +227,8 @@ Reuses `TestHarness.svelte` (wraps `ChatProvider` + `ChatWindow`).
 import { describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import TestHarness from './TestHarness.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ArtifactRecord, ChatEvent, ChatPlugin } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ArtifactRecord, ChatEvent, ChatPlugin } from '@chatkit-svelte/core';
 import CustomArtifactCard from './CustomArtifactCard.test-helper.svelte';
 
 function snapshotEvent(artifactId: string, value: string): ChatEvent {
@@ -301,7 +301,7 @@ Create the tiny test-helper component `packages/ui/src/CustomArtifactCard.test-h
 
 ```svelte
 <script lang="ts">
-  import type { ArtifactRecord } from '@chatkit/core';
+  import type { ArtifactRecord } from '@chatkit-svelte/core';
 
   interface Props {
     artifact: ArtifactRecord;
@@ -318,7 +318,7 @@ Create the tiny test-helper component `packages/ui/src/CustomArtifactCard.test-h
 - [x] **Step 2: Run and confirm failure**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/ui exec vitest run src/ArtifactPanel.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec vitest run src/ArtifactPanel.test.ts
 ```
 Expected: FAIL — no `artifact`/`custom-artifact` testid rendered (no `<ArtifactPanel>` yet).
 
@@ -326,7 +326,7 @@ Expected: FAIL — no `artifact`/`custom-artifact` testid rendered (no `<Artifac
 
 ```svelte
 <script lang="ts">
-  import { getChatContext } from '@chatkit/svelte';
+  import { getChatContext } from '@chatkit-svelte/svelte';
   import type { Component } from 'svelte';
 
   const store = getChatContext();
@@ -385,7 +385,7 @@ Full file content:
   import ApprovalBar from './ApprovalBar.svelte';
   import ArtifactPanel from './ArtifactPanel.svelte';
   import type { Snippet } from 'svelte';
-  import type { Message } from '@chatkit/core';
+  import type { Message } from '@chatkit-svelte/core';
 
   interface Props {
     message?: Snippet<[Message]>;
@@ -430,20 +430,20 @@ export { default as ArtifactPanel } from './ArtifactPanel.svelte';
 - [x] **Step 6: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/ui exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/ui exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec svelte-check --tsconfig ./tsconfig.json
 ```
 Expected: PASS — 19 tests (16 existing + 3 new), 0 svelte-check errors/warnings. The two `ChatWindow.test.ts` and five `ApprovalBar.test.ts` tests are unaffected (no artifacts registered in those configs, so `<ArtifactPanel>` renders nothing for them).
 
-- [x] **Step 7: Rebuild `@chatkit/ui`**
+- [x] **Step 7: Rebuild `@chatkit-svelte/ui`**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/ui build
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui build
 ```
 
 ---
 
-### Task 3: `@chatkit/plugin-forms`
+### Task 3: `@chatkit-svelte/plugin-forms`
 
 **Files:** (all new except `package.json`, which already has a scaffold)
 - Modify: `packages/plugin-forms/package.json`
@@ -456,11 +456,11 @@ npx pnpm@9.0.0 --filter @chatkit/ui build
 
 - [x] **Step 1: Build config — `package.json`/`tsconfig.json`/`vite.config.ts`/`vitest-setup.ts`**
 
-`package.json` (full content — the scaffold already has name/description/exports/scripts/`@chatkit/core` dependency; this adds `@chatkit/svelte` as a real dependency, since `FormRenderer` calls `getChatContext()`, and the missing devDependencies):
+`package.json` (full content — the scaffold already has name/description/exports/scripts/`@chatkit-svelte/core` dependency; this adds `@chatkit-svelte/svelte` as a real dependency, since `FormRenderer` calls `getChatContext()`, and the missing devDependencies):
 
 ```json
 {
-  "name": "@chatkit/plugin-forms",
+  "name": "@chatkit-svelte/plugin-forms",
   "version": "0.0.0",
   "description": "Agent-driven dynamic forms artifact (chatkit.form.* CUSTOM events): JSON-Schema-to-form renderer, client-side validation, submit round-trip.",
   "type": "module",
@@ -482,8 +482,8 @@ npx pnpm@9.0.0 --filter @chatkit/ui build
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*",
-    "@chatkit/svelte": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*",
+    "@chatkit-svelte/svelte": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
@@ -513,7 +513,7 @@ npx pnpm@9.0.0 --filter @chatkit/ui build
 }
 ```
 
-`vite.config.ts` — externalizes both `@chatkit/core` and `@chatkit/svelte` (the M3/M4-established pattern; skipping this would re-introduce the exact `Symbol('chatkit')` duplication bug fixed in M3):
+`vite.config.ts` — externalizes both `@chatkit-svelte/core` and `@chatkit-svelte/svelte` (the M3/M4-established pattern; skipping this would re-introduce the exact `Symbol('chatkit')` duplication bug fixed in M3):
 ```ts
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
@@ -529,7 +529,7 @@ export default defineConfig({
       fileName: 'index',
     },
     rollupOptions: {
-      external: ['svelte', /^svelte\//, '@chatkit/core', '@chatkit/svelte'],
+      external: ['svelte', /^svelte\//, '@chatkit-svelte/core', '@chatkit-svelte/svelte'],
     },
   },
   test: {
@@ -563,7 +563,7 @@ npx pnpm@9.0.0 install
 - [x] **Step 3: Write `packages/plugin-forms/src/types.ts`**
 
 ```ts
-import type { JSONSchema } from '@chatkit/core';
+import type { JSONSchema } from '@chatkit-svelte/core';
 
 export type FormFieldWidget = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'date' | 'file' | 'slider';
 
@@ -602,7 +602,7 @@ export interface FormResultPayload {
 ```ts
 import { describe, expect, it } from 'vitest';
 import { validateForm } from './validate';
-import type { JSONSchema } from '@chatkit/core';
+import type { JSONSchema } from '@chatkit-svelte/core';
 
 describe('validateForm', () => {
   it('reports a required field that is missing as an error', () => {
@@ -647,14 +647,14 @@ describe('validateForm', () => {
 - [x] **Step 5: Run and confirm failure**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-forms exec vitest run src/validate.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-forms exec vitest run src/validate.test.ts
 ```
 Expected: FAIL — `Cannot find module './validate'`.
 
 - [x] **Step 6: Write `packages/plugin-forms/src/validate.ts`**
 
 ```ts
-import type { JSONSchema } from '@chatkit/core';
+import type { JSONSchema } from '@chatkit-svelte/core';
 
 function isRequired(schema: JSONSchema, field: string): boolean {
   const required = schema.required as string[] | undefined;
@@ -700,7 +700,7 @@ export function validateForm(schema: JSONSchema, values: Record<string, unknown>
 - [x] **Step 7: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-forms exec vitest run src/validate.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-forms exec vitest run src/validate.test.ts
 ```
 Expected: PASS — 5 tests.
 
@@ -709,7 +709,7 @@ Expected: PASS — 5 tests.
 ```ts
 import { describe, expect, it, vi } from 'vitest';
 import { formArtifactReducer } from './artifact-reducer';
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 describe('formArtifactReducer', () => {
   it('matches chatkit.form.snapshot and chatkit.form.result CUSTOM events only', () => {
@@ -784,14 +784,14 @@ describe('formArtifactReducer', () => {
 - [x] **Step 9: Run and confirm failure**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-forms exec vitest run src/artifact-reducer.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-forms exec vitest run src/artifact-reducer.test.ts
 ```
 Expected: FAIL — `Cannot find module './artifact-reducer'`.
 
 - [x] **Step 10: Write `packages/plugin-forms/src/artifact-reducer.ts`**
 
 ```ts
-import type { ArtifactKind, ArtifactRecord, ChatEvent } from '@chatkit/core';
+import type { ArtifactKind, ArtifactRecord, ChatEvent } from '@chatkit-svelte/core';
 import type { FormArtifactData, FormResultPayload, FormSnapshotPayload } from './types';
 
 function isFormSnapshotPayload(payload: unknown): payload is FormSnapshotPayload {
@@ -856,7 +856,7 @@ export const formArtifactReducer = {
 - [x] **Step 11: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-forms exec vitest run src/artifact-reducer.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-forms exec vitest run src/artifact-reducer.test.ts
 ```
 Expected: PASS — 6 tests.
 
@@ -866,10 +866,10 @@ Expected: PASS — 6 tests.
 
 ```svelte
 <script lang="ts">
-  import { ChatProvider } from '@chatkit/svelte';
+  import { ChatProvider } from '@chatkit-svelte/svelte';
   import FormRenderer from './FormRenderer.svelte';
-  import type { ChatConfig } from '@chatkit/core';
-  import type { ArtifactRecord } from '@chatkit/core';
+  import type { ChatConfig } from '@chatkit-svelte/core';
+  import type { ArtifactRecord } from '@chatkit-svelte/core';
 
   interface Props {
     config: ChatConfig;
@@ -893,8 +893,8 @@ Expected: PASS — 6 tests.
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import TestHarness from './TestHarness.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ArtifactRecord } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ArtifactRecord } from '@chatkit-svelte/core';
 import type { FormArtifactData } from './types';
 
 function makeArtifact(data: Partial<FormArtifactData>, status: ArtifactRecord['status'] = 'draft'): ArtifactRecord {
@@ -984,7 +984,7 @@ describe('FormRenderer', () => {
 - [x] **Step 13: Run and confirm failure**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-forms exec vitest run src/FormRenderer.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-forms exec vitest run src/FormRenderer.test.ts
 ```
 Expected: FAIL — `Cannot find module './FormRenderer.svelte'`.
 
@@ -992,8 +992,8 @@ Expected: FAIL — `Cannot find module './FormRenderer.svelte'`.
 
 ```svelte
 <script lang="ts">
-  import { getChatContext } from '@chatkit/svelte';
-  import type { ArtifactRecord, ContentPart } from '@chatkit/core';
+  import { getChatContext } from '@chatkit-svelte/svelte';
+  import type { ArtifactRecord, ContentPart } from '@chatkit-svelte/core';
   import type { FormArtifactData } from './types';
   import { validateForm } from './validate';
 
@@ -1131,8 +1131,8 @@ Submit test note: because the `Submit` button's `type="submit"` inside a `<form 
 - [x] **Step 15: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-forms exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-forms exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-forms exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-forms exec svelte-check --tsconfig ./tsconfig.json
 ```
 Expected: PASS — 16 tests (5 validate + 6 artifact-reducer + 5 FormRenderer), 0 svelte-check errors/warnings.
 
@@ -1141,7 +1141,7 @@ Expected: PASS — 16 tests (5 validate + 6 artifact-reducer + 5 FormRenderer), 
 ```ts
 import FormRenderer from './FormRenderer.svelte';
 import { formArtifactReducer } from './artifact-reducer';
-import type { ChatPlugin } from '@chatkit/core';
+import type { ChatPlugin } from '@chatkit-svelte/core';
 
 export interface FormsPluginOptions {
   /** Accepted, not yet wired — no built-in widget takes a format-keyed component override this milestone. See plan decision 7. */
@@ -1169,14 +1169,14 @@ export type { FormArtifactData, FormResultPayload, FormSnapshotPayload, UiSchema
 - [x] **Step 17: Run the full suite once more and build**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-forms exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-forms build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-forms exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-forms build
 ```
 Expected: 16 tests still pass; build succeeds.
 
 ---
 
-### Task 4: `@chatkit/plugin-documents`
+### Task 4: `@chatkit-svelte/plugin-documents`
 
 **Files:** (all new except `package.json`, which already has a scaffold)
 - Modify: `packages/plugin-documents/package.json`
@@ -1189,11 +1189,11 @@ Expected: 16 tests still pass; build succeeds.
 
 - [x] **Step 1: Build config**
 
-`package.json` (adds `@chatkit/svelte` and `@chatkit/plugin-markdown` — the latter reused for markdown preview rendering rather than reimplementing a renderer — plus the standard missing devDependencies):
+`package.json` (adds `@chatkit-svelte/svelte` and `@chatkit-svelte/plugin-markdown` — the latter reused for markdown preview rendering rather than reimplementing a renderer — plus the standard missing devDependencies):
 
 ```json
 {
-  "name": "@chatkit/plugin-documents",
+  "name": "@chatkit-svelte/plugin-documents",
   "version": "0.0.0",
   "description": "Agent-authored document/artifact canvas (chatkit.document.* CUSTOM events): markdown mode first, ProseMirror richtext mode second.",
   "type": "module",
@@ -1215,9 +1215,9 @@ Expected: 16 tests still pass; build succeeds.
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*",
-    "@chatkit/svelte": "workspace:*",
-    "@chatkit/plugin-markdown": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*",
+    "@chatkit-svelte/svelte": "workspace:*",
+    "@chatkit-svelte/plugin-markdown": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
@@ -1236,7 +1236,7 @@ Expected: 16 tests still pass; build succeeds.
 
 `tsconfig.json` (same shape as `plugin-forms`'s), `vitest-setup.ts` (identical to `plugin-forms`'s).
 
-`vite.config.ts` — externalizes `@chatkit/plugin-markdown` too:
+`vite.config.ts` — externalizes `@chatkit-svelte/plugin-markdown` too:
 ```ts
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
@@ -1252,7 +1252,7 @@ export default defineConfig({
       fileName: 'index',
     },
     rollupOptions: {
-      external: ['svelte', /^svelte\//, '@chatkit/core', '@chatkit/svelte', '@chatkit/plugin-markdown'],
+      external: ['svelte', /^svelte\//, '@chatkit-svelte/core', '@chatkit-svelte/svelte', '@chatkit-svelte/plugin-markdown'],
     },
   },
   test: {
@@ -1275,7 +1275,7 @@ npx pnpm@9.0.0 install
 - [x] **Step 3: Write `packages/plugin-documents/src/types.ts`**
 
 ```ts
-import type { ArtifactRecord } from '@chatkit/core';
+import type { ArtifactRecord } from '@chatkit-svelte/core';
 
 export type ExportFormat = 'md' | 'txt' | 'docx' | 'pdf';
 
@@ -1308,7 +1308,7 @@ export type ExportHandlers = Partial<Record<ExportFormat, ExportHandler>>;
 ```ts
 import { describe, expect, it, vi } from 'vitest';
 import { documentArtifactReducer } from './artifact-reducer';
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 describe('documentArtifactReducer', () => {
   it('matches chatkit.document.snapshot and chatkit.document.delta CUSTOM events only', () => {
@@ -1371,12 +1371,12 @@ describe('documentArtifactReducer', () => {
 - [x] **Step 5: Run and confirm failure, then write `packages/plugin-documents/src/artifact-reducer.ts`**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-documents exec vitest run src/artifact-reducer.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-documents exec vitest run src/artifact-reducer.test.ts
 ```
 Expected: FAIL — module not found.
 
 ```ts
-import type { ArtifactKind, ArtifactRecord, ChatEvent } from '@chatkit/core';
+import type { ArtifactKind, ArtifactRecord, ChatEvent } from '@chatkit-svelte/core';
 import type { DocumentArtifactData, DocumentDeltaPayload, DocumentSnapshotPayload } from './types';
 
 function isDocumentSnapshotPayload(payload: unknown): payload is DocumentSnapshotPayload {
@@ -1441,7 +1441,7 @@ export const documentArtifactReducer = {
 - [x] **Step 6: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-documents exec vitest run src/artifact-reducer.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-documents exec vitest run src/artifact-reducer.test.ts
 ```
 Expected: PASS — 5 tests.
 
@@ -1450,7 +1450,7 @@ Expected: PASS — 5 tests.
 ```ts
 import { describe, expect, it } from 'vitest';
 import { exportDocument } from './export';
-import type { ArtifactRecord } from '@chatkit/core';
+import type { ArtifactRecord } from '@chatkit-svelte/core';
 
 function makeArtifact(content: string): ArtifactRecord {
   return {
@@ -1487,12 +1487,12 @@ describe('exportDocument', () => {
 - [x] **Step 8: Run and confirm failure, then write `packages/plugin-documents/src/export.ts`**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-documents exec vitest run src/export.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-documents exec vitest run src/export.test.ts
 ```
 Expected: FAIL — module not found.
 
 ```ts
-import type { ArtifactRecord } from '@chatkit/core';
+import type { ArtifactRecord } from '@chatkit-svelte/core';
 import type { DocumentArtifactData, ExportFormat, ExportHandlers } from './types';
 
 export async function exportDocument(
@@ -1517,7 +1517,7 @@ export async function exportDocument(
 - [x] **Step 9: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-documents exec vitest run src/export.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-documents exec vitest run src/export.test.ts
 ```
 Expected: PASS — 3 tests.
 
@@ -1526,9 +1526,9 @@ Expected: PASS — 3 tests.
 `packages/plugin-documents/src/TestHarness.svelte`:
 ```svelte
 <script lang="ts">
-  import { ChatProvider } from '@chatkit/svelte';
+  import { ChatProvider } from '@chatkit-svelte/svelte';
   import DocumentCanvas from './DocumentCanvas.svelte';
-  import type { ChatConfig, ArtifactRecord } from '@chatkit/core';
+  import type { ChatConfig, ArtifactRecord } from '@chatkit-svelte/core';
   import type { ExportHandlers } from './types';
 
   interface Props {
@@ -1553,8 +1553,8 @@ Expected: PASS — 3 tests.
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import TestHarness from './TestHarness.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ArtifactRecord } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ArtifactRecord } from '@chatkit-svelte/core';
 
 function makeArtifact(content: string, editable: boolean, status: ArtifactRecord['status'] = 'final'): ArtifactRecord {
   return {
@@ -1631,7 +1631,7 @@ describe('DocumentCanvas', () => {
 - [x] **Step 11: Run and confirm failure**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-documents exec vitest run src/DocumentCanvas.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-documents exec vitest run src/DocumentCanvas.test.ts
 ```
 Expected: FAIL — module not found.
 
@@ -1639,9 +1639,9 @@ Expected: FAIL — module not found.
 
 ```svelte
 <script lang="ts">
-  import { getChatContext } from '@chatkit/svelte';
-  import { Markdown } from '@chatkit/plugin-markdown';
-  import type { ArtifactRecord } from '@chatkit/core';
+  import { getChatContext } from '@chatkit-svelte/svelte';
+  import { Markdown } from '@chatkit-svelte/plugin-markdown';
+  import type { ArtifactRecord } from '@chatkit-svelte/core';
   import type { DocumentArtifactData, ExportHandlers, ExportFormat } from './types';
   import { exportDocument } from './export';
 
@@ -1762,8 +1762,8 @@ Expected: FAIL — module not found.
 - [x] **Step 13: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-documents exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-documents exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-documents exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-documents exec svelte-check --tsconfig ./tsconfig.json
 ```
 Expected: PASS — 13 tests (5 artifact-reducer + 3 export + 5 DocumentCanvas), 0 svelte-check errors/warnings.
 
@@ -1772,7 +1772,7 @@ Expected: PASS — 13 tests (5 artifact-reducer + 3 export + 5 DocumentCanvas), 
 ```ts
 import DocumentCanvas from './DocumentCanvas.svelte';
 import { documentArtifactReducer } from './artifact-reducer';
-import type { ChatPlugin } from '@chatkit/core';
+import type { ChatPlugin } from '@chatkit-svelte/core';
 import type { ExportHandlers } from './types';
 
 export interface DocumentsPluginOptions {
@@ -1803,8 +1803,8 @@ export type { DocumentArtifactData, DocumentDeltaPayload, DocumentSnapshotPayloa
 - [x] **Step 15: Run the full suite once more and build**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-documents exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-documents build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-documents exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-documents build
 ```
 Expected: 13 tests still pass; build succeeds.
 
@@ -1815,30 +1815,30 @@ Expected: 13 tests still pass; build succeeds.
 - [x] **Step 1: Rebuild all 9 packages in dependency order**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core build
-npx pnpm@9.0.0 --filter @chatkit/transport-agui build
-npx pnpm@9.0.0 --filter @chatkit/svelte build
-npx pnpm@9.0.0 --filter @chatkit/ui build
-npx pnpm@9.0.0 --filter @chatkit/plugin-tool-render build
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown build
-npx pnpm@9.0.0 --filter @chatkit/plugin-file-handling build
-npx pnpm@9.0.0 --filter @chatkit/plugin-forms build
-npx pnpm@9.0.0 --filter @chatkit/plugin-documents build
+npx pnpm@9.0.0 --filter @chatkit-svelte/core build
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui build
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte build
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-tool-render build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-file-handling build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-forms build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-documents build
 ```
 `plugin-documents` must build after `plugin-markdown` (real dependency, not just workspace ordering luck).
 
 - [x] **Step 2: Full regression suite across all 9 packages**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/svelte exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/ui exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-tool-render exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-file-handling exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-forms exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-documents exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-tool-render exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-file-handling exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-forms exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-documents exec vitest run
 ```
 Expected: 38 / 44 / 22 / 19 / 4 / 21 / 5 / 16 / 13 = 182 tests passing.
 

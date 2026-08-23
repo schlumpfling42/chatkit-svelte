@@ -1,6 +1,6 @@
 import FileRenderer from './FileRenderer.svelte';
 import ImageRenderer from './ImageRenderer.svelte';
-import type { ChatPlugin, ContentPart } from '@chatkit/core';
+import type { ChatPlugin, ContentPart } from '@chatkit-svelte/core';
 
 export interface FileHandlingOptions {
   /** MIME type patterns accepted, e.g. 'image/*' or 'application/pdf'. Default: images, PDFs, text files. */
@@ -21,7 +21,7 @@ export function fileHandlingPlugin(opts: FileHandlingOptions): ChatPlugin {
         maxSizeBytes: opts.maxSizeBytes ?? 25 * 1024 * 1024,
         async process(file, ctx): Promise<ContentPart> {
           // AttachmentHandler.process's `file` parameter is typed structurally
-          // ({ name, type, size }) by @chatkit/core so the plugin-host contract
+          // ({ name, type, size }) by @chatkit-svelte/core so the plugin-host contract
           // stays DOM-independent; at runtime it's always the real browser
           // File object Composer.svelte passes through, which `opts.upload`
           // needs directly (to read its bytes) — hence the cast.

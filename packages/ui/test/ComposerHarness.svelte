@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { createChatStore, setChatContext } from '@chatkit/svelte';
+  import { createChatStore, setChatContext } from '@chatkit-svelte/svelte';
   import Composer from '../src/Composer.svelte';
-  import type { ChatConfig } from '@chatkit/core';
+  import type { ChatConfig } from '@chatkit-svelte/core';
   import { untrack } from 'svelte';
 
   interface Props {

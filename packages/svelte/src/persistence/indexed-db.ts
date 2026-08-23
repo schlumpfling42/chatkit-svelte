@@ -1,5 +1,5 @@
-import { deriveTitle } from '@chatkit/core';
-import type { ChatState, PersistenceAdapter, ThreadSummary } from '@chatkit/core';
+import { deriveTitle } from '@chatkit-svelte/core';
+import type { ChatState, PersistenceAdapter, ThreadSummary } from '@chatkit-svelte/core';
 
 export interface IndexedDbPersistenceOptions {
   indexedDB?: IDBFactory;

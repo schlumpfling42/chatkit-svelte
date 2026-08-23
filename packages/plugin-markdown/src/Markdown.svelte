@@ -1,7 +1,7 @@
 <script lang="ts">
   import { parseBlocks } from './markdown-parser';
   import InlineNode from './InlineNode.svelte';
-  import type { ContentPart } from '@chatkit/core';
+  import type { ContentPart } from '@chatkit-svelte/core';
 
   interface Props {
     part: ContentPart & { type: 'text' };

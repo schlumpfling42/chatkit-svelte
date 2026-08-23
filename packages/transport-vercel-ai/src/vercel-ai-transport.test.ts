@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createVercelAiTransport } from './vercel-ai-transport';
-import type { RunAgentInput } from '@chatkit/core';
+import type { RunAgentInput } from '@chatkit-svelte/core';
 
 async function startServer(handler: (req: IncomingMessage, res: ServerResponse) => void): Promise<{ server: Server; endpoint: string }> {
   const server = createServer(handler);

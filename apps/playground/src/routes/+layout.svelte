@@ -1,5 +1,5 @@
 <script lang="ts">
-  import '@chatkit/ui/tokens.css';
+  import '@chatkit-svelte/ui/tokens.css';
   import type { Snippet } from 'svelte';
 
   interface Props {

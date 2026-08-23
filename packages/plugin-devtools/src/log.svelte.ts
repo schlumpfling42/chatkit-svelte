@@ -1,4 +1,4 @@
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 export interface DevtoolsLog {
   readonly events: ChatEvent[];

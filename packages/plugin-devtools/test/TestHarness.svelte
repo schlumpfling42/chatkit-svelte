@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { ChatProvider } from '@chatkit/svelte';
+  import { ChatProvider } from '@chatkit-svelte/svelte';
   import DevtoolsOverlay from '../src/DevtoolsOverlay.svelte';
-  import type { ChatConfig } from '@chatkit/core';
+  import type { ChatConfig } from '@chatkit-svelte/core';
   import type { DevtoolsLog } from '../src/log.svelte';
 
   interface Props {

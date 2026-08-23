@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { getChatContext } from '@chatkit/svelte';
-  import type { ContentPart } from '@chatkit/core';
+  import { getChatContext } from '@chatkit-svelte/svelte';
+  import type { ContentPart } from '@chatkit-svelte/core';
 
   interface Props {
     class?: string;

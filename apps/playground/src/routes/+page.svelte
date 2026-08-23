@@ -1,16 +1,16 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { ChatProvider } from '@chatkit/svelte';
-  import { ChatWindow } from '@chatkit/ui';
-  import { createFixtureTransport } from '@chatkit/core';
-  import { fileHandlingPlugin } from '@chatkit/plugin-file-handling';
-  import { markdownPlugin } from '@chatkit/plugin-markdown';
-  import { toolRenderPlugin } from '@chatkit/plugin-tool-render';
-  import { formsPlugin } from '@chatkit/plugin-forms';
-  import { documentsPlugin } from '@chatkit/plugin-documents';
-  import { devtoolsPlugin, DevtoolsOverlay } from '@chatkit/plugin-devtools';
+  import { ChatProvider } from '@chatkit-svelte/svelte';
+  import { ChatWindow } from '@chatkit-svelte/ui';
+  import { createFixtureTransport } from '@chatkit-svelte/core';
+  import { fileHandlingPlugin } from '@chatkit-svelte/plugin-file-handling';
+  import { markdownPlugin } from '@chatkit-svelte/plugin-markdown';
+  import { toolRenderPlugin } from '@chatkit-svelte/plugin-tool-render';
+  import { formsPlugin } from '@chatkit-svelte/plugin-forms';
+  import { documentsPlugin } from '@chatkit-svelte/plugin-documents';
+  import { devtoolsPlugin, DevtoolsOverlay } from '@chatkit-svelte/plugin-devtools';
   import { fixtures, FIXTURE_NAMES, type FixtureName } from '$lib/fixtures';
-  import type { ChatConfig } from '@chatkit/core';
+  import type { ChatConfig } from '@chatkit-svelte/core';
 
   const fixtureName = $derived(
     (($page.url.searchParams.get('fixture') as FixtureName | null) ?? 'text-streaming') satisfies FixtureName

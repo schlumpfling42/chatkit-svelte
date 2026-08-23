@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to this project are documented here. Versions are shared
-across the whole `@chatkit/*` workspace (all packages release together).
+across the whole `@chatkit-svelte/*` workspace (all packages release together).
 
 ## 0.1.0 — Initial release
 
@@ -12,27 +12,27 @@ document per milestone.
 
 ### Core framework
 
-- **`@chatkit/core`** — framework-agnostic types, a pure `reduceEvent` reducer
+- **`@chatkit-svelte/core`** — framework-agnostic types, a pure `reduceEvent` reducer
   for the full AG-UI event union (text streaming, tool calls, reasoning,
   state sync, activities, artifacts), an RFC 6902 JSON Patch implementation,
   a plugin host (renderer registries, hook composition, duplicate-registration
   guards), human-in-the-loop approval detection, i18n message translation,
   and a `PersistenceAdapter` contract with an in-memory implementation.
-- **`@chatkit/transport-agui`** — the default AG-UI transport: SSE and
+- **`@chatkit-svelte/transport-agui`** — the default AG-UI transport: SSE and
   WebSocket modes, exponential backoff with jitter and flap protection,
   automatic `STATE_DELTA` → `STATE_SNAPSHOT` recovery on a patch conflict,
   bounded event queue with backpressure coalescing.
-- **`@chatkit/transport-vercel-ai`** — a second transport adapter for the
+- **`@chatkit-svelte/transport-vercel-ai`** — a second transport adapter for the
   Vercel AI SDK's data stream protocol, proving the transport abstraction
   holds for a fundamentally different wire shape (one-fetch-per-turn vs.
   AG-UI's persistent event stream).
-- **`@chatkit/svelte`** — Svelte 5 (runes) bindings: `createChatStore`,
+- **`@chatkit-svelte/svelte`** — Svelte 5 (runes) bindings: `createChatStore`,
   `<ChatProvider>`, `getChatContext()`, debounced persistence (localStorage
   and IndexedDB adapters), i18n (`store.t()`/`store.dir`).
 
 ### UI
 
-- **`@chatkit/ui`** — themed components (`<ChatWindow>`, `<MessageList>`,
+- **`@chatkit-svelte/ui`** — themed components (`<ChatWindow>`, `<MessageList>`,
   `<Composer>`, `<ApprovalBar>`, `<ArtifactPanel>`), a CSS-custom-property
   token theme (light/dark/density variants), an optional Tailwind preset, and
   an automated WCAG AA contrast audit against the shipped token values.

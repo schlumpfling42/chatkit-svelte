@@ -1,5 +1,5 @@
 {
-  "name": "@chatkit/ui",
+  "name": "@chatkit-svelte/ui",
   "version": "0.1.0",
   "license": "MIT",
   "description": "Themed Svelte 5 component library (CSS-variable theme + optional Tailwind preset). Restyle-only via tokens.",
@@ -27,8 +27,8 @@
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*",
-    "@chatkit/svelte": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*",
+    "@chatkit-svelte/svelte": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/package": "^2.5.0",

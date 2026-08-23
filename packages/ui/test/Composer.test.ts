@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import ComposerHarness from './ComposerHarness.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ChatPlugin } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ChatPlugin } from '@chatkit-svelte/core';
 
 describe('Composer — attachments', () => {
   it('does not show an attach button when no attachmentHandlers are registered', () => {

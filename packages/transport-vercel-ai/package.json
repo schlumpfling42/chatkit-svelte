@@ -1,5 +1,5 @@
 {
-  "name": "@chatkit/transport-vercel-ai",
+  "name": "@chatkit-svelte/transport-vercel-ai",
   "version": "0.1.0",
   "license": "MIT",
   "description": "Adapter for the Vercel AI SDK data stream protocol, normalized into ChatEvent. Proves the transport abstraction holds (M7).",
@@ -20,7 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.5.0",

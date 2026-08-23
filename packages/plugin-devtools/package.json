@@ -1,5 +1,5 @@
 {
-  "name": "@chatkit/plugin-devtools",
+  "name": "@chatkit-svelte/plugin-devtools",
   "version": "0.1.0",
   "license": "MIT",
   "description": "Overlay logging raw wire events + live state inspection; export-fixture button that dumps event sequences in the fixture format used by conformance tests.",
@@ -25,8 +25,8 @@
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*",
-    "@chatkit/svelte": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*",
+    "@chatkit-svelte/svelte": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/package": "^2.5.0",

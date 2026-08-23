@@ -1,4 +1,4 @@
-import type { JSONSchema } from '@chatkit/core';
+import type { JSONSchema } from '@chatkit-svelte/core';
 
 function isRequired(schema: JSONSchema, field: string): boolean {
   const required = schema.required as string[] | undefined;

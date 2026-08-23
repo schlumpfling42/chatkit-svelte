@@ -24,24 +24,24 @@ export interface GeneratedFile {
 
 const PLUGIN_PACKAGES: Record<PluginChoice, { pkg: string; importName: string; factory: string }> = {
   'file-handling': {
-    pkg: '@chatkit/plugin-file-handling',
+    pkg: '@chatkit-svelte/plugin-file-handling',
     importName: 'fileHandlingPlugin',
     factory: 'fileHandlingPlugin({ upload: async (file) => ({ url: URL.createObjectURL(file) }) })',
   },
-  markdown: { pkg: '@chatkit/plugin-markdown', importName: 'markdownPlugin', factory: 'markdownPlugin()' },
-  forms: { pkg: '@chatkit/plugin-forms', importName: 'formsPlugin', factory: 'formsPlugin()' },
-  documents: { pkg: '@chatkit/plugin-documents', importName: 'documentsPlugin', factory: 'documentsPlugin()' },
-  devtools: { pkg: '@chatkit/plugin-devtools', importName: 'devtoolsPlugin', factory: 'devtoolsPlugin()' },
+  markdown: { pkg: '@chatkit-svelte/plugin-markdown', importName: 'markdownPlugin', factory: 'markdownPlugin()' },
+  forms: { pkg: '@chatkit-svelte/plugin-forms', importName: 'formsPlugin', factory: 'formsPlugin()' },
+  documents: { pkg: '@chatkit-svelte/plugin-documents', importName: 'documentsPlugin', factory: 'documentsPlugin()' },
+  devtools: { pkg: '@chatkit-svelte/plugin-devtools', importName: 'devtoolsPlugin', factory: 'devtoolsPlugin()' },
 };
 
 const TRANSPORT_PACKAGES: Record<TransportChoice, { pkg: string; importName: string; factory: string }> = {
   agui: {
-    pkg: '@chatkit/transport-agui',
+    pkg: '@chatkit-svelte/transport-agui',
     importName: 'createAguiTransport',
     factory: "createAguiTransport({ endpoint: '/api/agent' })",
   },
   'vercel-ai': {
-    pkg: '@chatkit/transport-vercel-ai',
+    pkg: '@chatkit-svelte/transport-vercel-ai',
     importName: 'createVercelAiTransport',
     factory: "createVercelAiTransport({ endpoint: '/api/agent' })",
   },
@@ -68,9 +68,9 @@ export function generateProject(options: GenerateProjectOptions): GeneratedFile[
     },
     dependencies: {
       svelte: '^5.0.0',
-      '@chatkit/core': '^0.0.0',
-      '@chatkit/svelte': '^0.0.0',
-      '@chatkit/ui': '^0.0.0',
+      '@chatkit-svelte/core': '^0.0.0',
+      '@chatkit-svelte/svelte': '^0.0.0',
+      '@chatkit-svelte/ui': '^0.0.0',
       [transportChoice.pkg]: '^0.0.0',
       ...Object.fromEntries(pluginEntries.map((e) => [e.pkg, '^0.0.0'])),
     },
@@ -115,8 +115,8 @@ mount(App, { target: document.getElementById('app')! });
   const appSvelte =
     theme === 'system'
       ? `<script lang="ts">
-  import { ChatProvider } from '@chatkit/svelte';
-  import { ChatWindow } from '@chatkit/ui';
+  import { ChatProvider } from '@chatkit-svelte/svelte';
+  import { ChatWindow } from '@chatkit-svelte/ui';
   import { ${transportChoice.importName} } from '${transportChoice.pkg}';
   import { plugins } from './chatkit.config';
 
@@ -138,8 +138,8 @@ mount(App, { target: document.getElementById('app')! });
 </div>
 `
       : `<script lang="ts">
-  import { ChatProvider } from '@chatkit/svelte';
-  import { ChatWindow } from '@chatkit/ui';
+  import { ChatProvider } from '@chatkit-svelte/svelte';
+  import { ChatWindow } from '@chatkit-svelte/ui';
   import { ${transportChoice.importName} } from '${transportChoice.pkg}';
   import { plugins } from './chatkit.config';
 

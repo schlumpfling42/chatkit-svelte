@@ -2,7 +2,7 @@
   "name": "create-chatkit",
   "version": "0.1.0",
   "license": "MIT",
-  "description": "npx create-chatkit my-chat-app — scaffolds a bare Vite+Svelte app wired to @chatkit/svelte + @chatkit/ui with chosen plugins/theme. SvelteKit scaffolding is not yet supported.",
+  "description": "npx create-chatkit my-chat-app — scaffolds a bare Vite+Svelte app wired to @chatkit-svelte/svelte + @chatkit-svelte/ui with chosen plugins/theme. SvelteKit scaffolding is not yet supported.",
   "type": "module",
   "bin": {
     "create-chatkit": "./dist/index.js"

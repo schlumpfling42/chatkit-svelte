@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { localStoragePersistence } from '../../src/persistence/local-storage';
-import { initialState } from '@chatkit/core';
-import type { ChatState, Message } from '@chatkit/core';
+import { initialState } from '@chatkit-svelte/core';
+import type { ChatState, Message } from '@chatkit-svelte/core';
 
 function userMessage(text: string): Message {
   return { id: 'm1', role: 'user', parts: [{ type: 'text', text }], createdAt: 0, streaming: false };

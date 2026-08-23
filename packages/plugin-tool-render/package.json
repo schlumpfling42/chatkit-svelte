@@ -1,5 +1,5 @@
 {
-  "name": "@chatkit/plugin-tool-render",
+  "name": "@chatkit-svelte/plugin-tool-render",
   "version": "0.1.0",
   "license": "MIT",
   "description": "Generic fallback tool-call visualization (collapsible args/result JSON view) for any tool without a custom toolRenderer registered.",
@@ -25,7 +25,7 @@
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/package": "^2.5.0",

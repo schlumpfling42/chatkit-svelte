@@ -1,4 +1,4 @@
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 // A tiny inline SVG so the file-handling fixture has something real to
 // render without depending on an external image host (keeps e2e runs

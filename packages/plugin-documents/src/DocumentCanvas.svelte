@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { getChatContext } from '@chatkit/svelte';
-  import { Markdown } from '@chatkit/plugin-markdown';
-  import type { ArtifactRecord } from '@chatkit/core';
+  import { getChatContext } from '@chatkit-svelte/svelte';
+  import { Markdown } from '@chatkit-svelte/plugin-markdown';
+  import type { ArtifactRecord } from '@chatkit-svelte/core';
   import type { DocumentArtifactData, ExportHandlers, ExportFormat } from './types';
   import { exportDocument } from './export';
 

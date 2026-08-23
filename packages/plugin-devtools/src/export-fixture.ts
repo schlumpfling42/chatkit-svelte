@@ -1,4 +1,4 @@
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 // Matches createFixtureTransport(events)'s expected input shape exactly —
 // paste this file's output straight into a test as

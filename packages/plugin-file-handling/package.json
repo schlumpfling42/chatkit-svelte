@@ -1,5 +1,5 @@
 {
-  "name": "@chatkit/plugin-file-handling",
+  "name": "@chatkit-svelte/plugin-file-handling",
   "version": "0.1.0",
   "license": "MIT",
   "description": "Attachment pipeline (validate/upload) and file & image message renderers. Drag-drop/paste input transforms are a documented fast-follow, not included in this milestone.",
@@ -25,7 +25,7 @@
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/package": "^2.5.0",

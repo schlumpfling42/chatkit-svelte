@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { ChatProvider } from '@chatkit/svelte';
+  import { ChatProvider } from '@chatkit-svelte/svelte';
   import FormRenderer from '../src/FormRenderer.svelte';
-  import type { ChatConfig, ArtifactRecord } from '@chatkit/core';
+  import type { ChatConfig, ArtifactRecord } from '@chatkit-svelte/core';
 
   interface Props {
     config: ChatConfig;

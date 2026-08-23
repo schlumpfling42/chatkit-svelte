@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { getChatContext } from '@chatkit/svelte';
+  import { getChatContext } from '@chatkit-svelte/svelte';
   import { onDestroy } from 'svelte';
   import type { Snippet, Component } from 'svelte';
-  import type { ContentPart, Message } from '@chatkit/core';
+  import type { ContentPart, Message } from '@chatkit-svelte/core';
 
   interface Props {
     message?: Snippet<[Message]>;
@@ -13,7 +13,7 @@
   const store = getChatContext();
 
   // The plugin registry stores renderer components as `unknown` in
-  // @chatkit/core (deliberately — core has no Svelte dependency). This is
+  // @chatkit-svelte/core (deliberately — core has no Svelte dependency). This is
   // the trust boundary where that gets cast back to a concrete Svelte
   // Component type: plugin authors are responsible for matching the
   // { part } / { toolCall } prop shape a registration implies.

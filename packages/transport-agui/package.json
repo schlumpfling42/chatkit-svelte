@@ -1,5 +1,5 @@
 {
-  "name": "@chatkit/transport-agui",
+  "name": "@chatkit-svelte/transport-agui",
   "version": "0.1.0",
   "license": "MIT",
   "description": "AG-UI protocol client (SSE + WebSocket + HTTP fallback, reconnect/backoff). See README for the AG-UI event-set version this targets.",
@@ -20,7 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

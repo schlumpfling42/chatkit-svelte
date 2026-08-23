@@ -1,5 +1,5 @@
 import Markdown from './Markdown.svelte';
-import type { ChatPlugin } from '@chatkit/core';
+import type { ChatPlugin } from '@chatkit-svelte/core';
 
 /**
  * Registers Markdown as the messageRenderer for 'text' content parts, taking

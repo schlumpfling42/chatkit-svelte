@@ -1,4 +1,4 @@
-import type { ArtifactKind, ArtifactRecord, ChatEvent } from '@chatkit/core';
+import type { ArtifactKind, ArtifactRecord, ChatEvent } from '@chatkit-svelte/core';
 import type { DocumentArtifactData, DocumentDeltaPayload, DocumentSnapshotPayload } from './types';
 
 function isDocumentSnapshotPayload(payload: unknown): payload is DocumentSnapshotPayload {

@@ -20,31 +20,31 @@ importers:
 
   apps/playground:
     dependencies:
-      '@chatkit/core':
+      '@chatkit-svelte/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@chatkit/plugin-devtools':
+      '@chatkit-svelte/plugin-devtools':
         specifier: workspace:*
         version: link:../../packages/plugin-devtools
-      '@chatkit/plugin-documents':
+      '@chatkit-svelte/plugin-documents':
         specifier: workspace:*
         version: link:../../packages/plugin-documents
-      '@chatkit/plugin-file-handling':
+      '@chatkit-svelte/plugin-file-handling':
         specifier: workspace:*
         version: link:../../packages/plugin-file-handling
-      '@chatkit/plugin-forms':
+      '@chatkit-svelte/plugin-forms':
         specifier: workspace:*
         version: link:../../packages/plugin-forms
-      '@chatkit/plugin-markdown':
+      '@chatkit-svelte/plugin-markdown':
         specifier: workspace:*
         version: link:../../packages/plugin-markdown
-      '@chatkit/plugin-tool-render':
+      '@chatkit-svelte/plugin-tool-render':
         specifier: workspace:*
         version: link:../../packages/plugin-tool-render
-      '@chatkit/svelte':
+      '@chatkit-svelte/svelte':
         specifier: workspace:*
         version: link:../../packages/svelte
-      '@chatkit/ui':
+      '@chatkit-svelte/ui':
         specifier: workspace:*
         version: link:../../packages/ui
     devDependencies:
@@ -102,10 +102,10 @@ importers:
 
   packages/plugin-devtools:
     dependencies:
-      '@chatkit/core':
+      '@chatkit-svelte/core':
         specifier: workspace:*
         version: link:../core
-      '@chatkit/svelte':
+      '@chatkit-svelte/svelte':
         specifier: workspace:*
         version: link:../svelte
     devDependencies:
@@ -142,13 +142,13 @@ importers:
 
   packages/plugin-documents:
     dependencies:
-      '@chatkit/core':
+      '@chatkit-svelte/core':
         specifier: workspace:*
         version: link:../core
-      '@chatkit/plugin-markdown':
+      '@chatkit-svelte/plugin-markdown':
         specifier: workspace:*
         version: link:../plugin-markdown
-      '@chatkit/svelte':
+      '@chatkit-svelte/svelte':
         specifier: workspace:*
         version: link:../svelte
     devDependencies:
@@ -185,7 +185,7 @@ importers:
 
   packages/plugin-file-handling:
     dependencies:
-      '@chatkit/core':
+      '@chatkit-svelte/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -222,10 +222,10 @@ importers:
 
   packages/plugin-forms:
     dependencies:
-      '@chatkit/core':
+      '@chatkit-svelte/core':
         specifier: workspace:*
         version: link:../core
-      '@chatkit/svelte':
+      '@chatkit-svelte/svelte':
         specifier: workspace:*
         version: link:../svelte
     devDependencies:
@@ -262,7 +262,7 @@ importers:
 
   packages/plugin-markdown:
     dependencies:
-      '@chatkit/core':
+      '@chatkit-svelte/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -299,7 +299,7 @@ importers:
 
   packages/plugin-tool-render:
     dependencies:
-      '@chatkit/core':
+      '@chatkit-svelte/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -336,7 +336,7 @@ importers:
 
   packages/svelte:
     dependencies:
-      '@chatkit/core':
+      '@chatkit-svelte/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -376,7 +376,7 @@ importers:
 
   packages/transport-agui:
     dependencies:
-      '@chatkit/core':
+      '@chatkit-svelte/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -404,7 +404,7 @@ importers:
 
   packages/transport-vercel-ai:
     dependencies:
-      '@chatkit/core':
+      '@chatkit-svelte/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -423,10 +423,10 @@ importers:
 
   packages/ui:
     dependencies:
-      '@chatkit/core':
+      '@chatkit-svelte/core':
         specifier: workspace:*
         version: link:../core
-      '@chatkit/svelte':
+      '@chatkit-svelte/svelte':
         specifier: workspace:*
         version: link:../svelte
     devDependencies:

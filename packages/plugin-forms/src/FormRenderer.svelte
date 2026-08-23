@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { getChatContext } from '@chatkit/svelte';
+  import { getChatContext } from '@chatkit-svelte/svelte';
   import { untrack } from 'svelte';
-  import { defaultMessages } from '@chatkit/core';
-  import type { ArtifactRecord, ContentPart } from '@chatkit/core';
+  import { defaultMessages } from '@chatkit-svelte/core';
+  import type { ArtifactRecord, ContentPart } from '@chatkit-svelte/core';
   import type { FormArtifactData } from './types';
   import { validateForm } from './validate';
 

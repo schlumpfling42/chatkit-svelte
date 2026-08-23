@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createChatStore } from '../src/chat-store.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ArtifactReducer, ChatEvent, ChatPlugin, ChatState, PersistenceAdapter } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ArtifactReducer, ChatEvent, ChatPlugin, ChatState, PersistenceAdapter } from '@chatkit-svelte/core';
 
 describe('createChatStore', () => {
   it('reflects streamed events reactively via getters', async () => {

@@ -4,7 +4,7 @@
 >
 > **Git note:** commit steps are intentionally omitted from this plan — the repo owner handles git operations manually. Do not run `git add`/`git commit` while executing this plan unless the user explicitly asks for it in the moment.
 
-**Goal:** Build `@chatkit/core` — the framework-agnostic foundation (types, reducer, JSON Patch, plugin host, transport contract, in-memory fixture transport) that every later milestone (AG-UI transport, Svelte bindings, UI, plugins) is built on top of. No Svelte, no DOM dependency, fully testable under Node.
+**Goal:** Build `@chatkit-svelte/core` — the framework-agnostic foundation (types, reducer, JSON Patch, plugin host, transport contract, in-memory fixture transport) that every later milestone (AG-UI transport, Svelte bindings, UI, plugins) is built on top of. No Svelte, no DOM dependency, fully testable under Node.
 
 **Architecture:** A single pure-function reducer (`reduceEvent`) folds a stream of normalized `ChatEvent`s into `ChatState`. `ChatTransport` is the seam between wire protocols and the reducer — for M0 the only implementation is an in-memory fixture transport that replays a canned `ChatEvent[]`, proving the reducer/transport contract works end-to-end before a real network transport (M1) exists. `createPluginHost` builds the plugin registry/lifecycle contract that later plugins (M3+) hook into; concrete UI component types are left as `unknown` in `core` since Svelte components don't belong in a DOM-free package.
 
@@ -111,9 +111,9 @@ export default defineConfig({
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core install
+npx pnpm@9.0.0 --filter @chatkit-svelte/core install
 ```
-Expected: succeeds (package.json for `@chatkit/core` was created during initial scaffolding and already lists `typescript`, `vite`, `vite-plugin-dts`, `vitest`).
+Expected: succeeds (package.json for `@chatkit-svelte/core` was created during initial scaffolding and already lists `typescript`, `vite`, `vite-plugin-dts`, `vitest`).
 
 ---
 
@@ -251,7 +251,7 @@ export type JSONSchema = Record<string, unknown>;
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec tsc --noEmit
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec tsc --noEmit
 ```
 Expected: no errors (there's nothing importing `types.ts` yet, but a syntax/type error in the file itself would still surface).
 
@@ -335,7 +335,7 @@ describe('applyPatch', () => {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/json-patch.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/json-patch.test.ts
 ```
 Expected: FAIL — `Cannot find module './json-patch'` (file doesn't exist yet).
 
@@ -497,7 +497,7 @@ export function applyPatch(document: unknown, patch: JsonPatchOperation[]): Appl
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/json-patch.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/json-patch.test.ts
 ```
 Expected: PASS — 8 tests.
 
@@ -566,7 +566,7 @@ describe('reduceEvent — text messages', () => {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/reducer.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/reducer.test.ts
 ```
 Expected: FAIL — `Cannot find module './reducer'`.
 
@@ -639,7 +639,7 @@ export function reduceEvent(state: ChatState, event: ChatEvent): ChatState {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/reducer.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/reducer.test.ts
 ```
 Expected: PASS — 4 tests.
 
@@ -694,7 +694,7 @@ describe('reduceEvent — tool calls', () => {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/reducer.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/reducer.test.ts
 ```
 Expected: FAIL — `TOOL_CALL_START` etc. fall into the `default` case, so `state.messages[0].parts` never gets a `tool_call` part and `.find(...)` returns `undefined`.
 
@@ -838,7 +838,7 @@ export function reduceEvent(state: ChatState, event: ChatEvent): ChatState {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/reducer.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/reducer.test.ts
 ```
 Expected: PASS — 6 tests.
 
@@ -927,7 +927,7 @@ describe('reduceEvent — escape hatches', () => {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/reducer.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/reducer.test.ts
 ```
 Expected: FAIL — `REASONING_*`, `STATE_SNAPSHOT`/`STATE_DELTA`, `ACTIVITY_*` all currently fall into `default: return state`, so shared state/activities/reasoning messages never populate.
 
@@ -1129,7 +1129,7 @@ export function reduceEvent(state: ChatState, event: ChatEvent): ChatState {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/reducer.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/reducer.test.ts
 ```
 Expected: PASS — 13 tests.
 
@@ -1238,7 +1238,7 @@ describe('createFixtureTransport', () => {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/testing/fixture-transport.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/testing/fixture-transport.test.ts
 ```
 Expected: FAIL — `Cannot find module './fixture-transport'`.
 
@@ -1300,7 +1300,7 @@ export function createFixtureTransport(
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/testing/fixture-transport.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/testing/fixture-transport.test.ts
 ```
 Expected: PASS — 3 tests.
 
@@ -1332,7 +1332,7 @@ describe('docs/fixtures/text-streaming-basic.json', () => {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/testing/fixture-transport.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/testing/fixture-transport.test.ts
 ```
 Expected: PASS — 4 tests.
 
@@ -1492,7 +1492,7 @@ describe('createPluginHost — runHook', () => {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/plugin-host.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/plugin-host.test.ts
 ```
 Expected: FAIL — `Cannot find module './plugin-host'`.
 
@@ -1516,7 +1516,7 @@ export interface ToolCall {
 
 export interface MessageRendererRegistration {
   partType: ContentPart['type'];
-  component: unknown; // concrete Svelte component type supplied by @chatkit/svelte consumers (M2+)
+  component: unknown; // concrete Svelte component type supplied by @chatkit-svelte/svelte consumers (M2+)
   priority?: number;
 }
 
@@ -1680,7 +1680,7 @@ export function createPluginHost(plugins: ChatPlugin[]): PluginHost {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/plugin-host.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/plugin-host.test.ts
 ```
 Expected: PASS — 8 tests.
 
@@ -1708,7 +1708,7 @@ export type { FixtureTransportOptions, FixtureTransportRecorder } from './testin
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run
 ```
 Expected: PASS — 4 test files, 33 tests (8 json-patch + 13 reducer + 4 fixture-transport + 8 plugin-host — note reducer.test.ts's final count is 13, not the 6 from Task 5, since Task 6 appended more; fixture-transport.test.ts's final count is 4 after Task 7 Step 6).
 
@@ -1716,7 +1716,7 @@ Expected: PASS — 4 test files, 33 tests (8 json-patch + 13 reducer + 4 fixture
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec tsc --noEmit
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec tsc --noEmit
 ```
 Expected: no errors.
 
@@ -1724,7 +1724,7 @@ Expected: no errors.
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core build
+npx pnpm@9.0.0 --filter @chatkit-svelte/core build
 ```
 Expected: succeeds, producing `packages/core/dist/index.js` and `packages/core/dist/index.d.ts`.
 

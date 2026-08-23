@@ -26,7 +26,7 @@
 
 Other prefixes from the full spec (`1`,`2`,`8`,`e`,`f`,`g`,`h`,`i`,`j`,`k` — data parts, annotations, step boundaries, reasoning, sources, files) are parsed-but-ignored (unrecognized prefixes are skipped, not thrown on — forward-compatible, same "unknown CUSTOM event → no-op" posture the reducer already takes for AG-UI).
 
-**3. `ChatTransport.connect()`/`sendRun()` don't map onto the Vercel AI SDK's request model as separate concepts — bridged with a tiny local push-pull queue.** AG-UI has a persistent server-push event stream (`connect()`) decoupled from POSTing a run (`sendRun()`). The Vercel AI SDK's actual client/server contract is one-fetch-per-turn: POST the full message history, the streamed response *is* that turn's reply. To fit `ChatTransport`'s shape (where `connect()` must return an iterable immediately, before any `sendRun()` call), this transport keeps one small internal async queue for the store's whole lifetime; `connect()` returns its iterable, and each `sendRun()` call performs its own fetch and pushes the parsed events from that fetch's response into the same queue. `transport-agui`'s `push-pull-bridge.ts` already does exactly this, but it's an internal module, not exported from `@chatkit/transport-agui`'s public API — reimplemented locally here (~20 lines) rather than adding a cross-transport-package dependency two independently-installable transport packages shouldn't need on each other.
+**3. `ChatTransport.connect()`/`sendRun()` don't map onto the Vercel AI SDK's request model as separate concepts — bridged with a tiny local push-pull queue.** AG-UI has a persistent server-push event stream (`connect()`) decoupled from POSTing a run (`sendRun()`). The Vercel AI SDK's actual client/server contract is one-fetch-per-turn: POST the full message history, the streamed response *is* that turn's reply. To fit `ChatTransport`'s shape (where `connect()` must return an iterable immediately, before any `sendRun()` call), this transport keeps one small internal async queue for the store's whole lifetime; `connect()` returns its iterable, and each `sendRun()` call performs its own fetch and pushes the parsed events from that fetch's response into the same queue. `transport-agui`'s `push-pull-bridge.ts` already does exactly this, but it's an internal module, not exported from `@chatkit-svelte/transport-agui`'s public API — reimplemented locally here (~20 lines) rather than adding a cross-transport-package dependency two independently-installable transport packages shouldn't need on each other.
 
 **4. Outbound message mapping is text-only.** `RunAgentInput.messages` (chatkit's `Message[]`, with `ContentPart[]` parts) has no one-to-one mapping onto the Vercel AI SDK's message schema for images/files/tool-calls without picking a specific SDK version's exact schema (which, per decision 1, isn't the target here). `toVercelMessages()` maps each chatkit message to `{ role, content }`, where `content` is the concatenation of that message's `text` parts. Non-text parts are dropped from the outbound request. This is enough to prove the transport abstraction holds for real text conversations (the milestone's stated purpose) without taking on full multi-modal protocol parity as unstated scope.
 
@@ -62,15 +62,15 @@ docs/superpowers/plans/2026-08-23-m6-theming-persistence-a11y-cli.md # Task 3 �
 
 ---
 
-### Task 1: `@chatkit/transport-vercel-ai`
+### Task 1: `@chatkit-svelte/transport-vercel-ai`
 
 - [x] **Step 1: Build config**
 
-`packages/transport-vercel-ai/package.json` (adds the missing `vitest`-adjacent nothing — this package is pure TS, no Svelte, same shape as `@chatkit/core`/`@chatkit/transport-agui`; the scaffold already has the right dependencies, only `vite.config.ts`/`tsconfig.json` are missing):
+`packages/transport-vercel-ai/package.json` (adds the missing `vitest`-adjacent nothing — this package is pure TS, no Svelte, same shape as `@chatkit-svelte/core`/`@chatkit-svelte/transport-agui`; the scaffold already has the right dependencies, only `vite.config.ts`/`tsconfig.json` are missing):
 
 ```json
 {
-  "name": "@chatkit/transport-vercel-ai",
+  "name": "@chatkit-svelte/transport-vercel-ai",
   "version": "0.0.0",
   "description": "Adapter for the Vercel AI SDK data stream protocol, normalized into ChatEvent. Proves the transport abstraction holds (M7).",
   "type": "module",
@@ -88,7 +88,7 @@ docs/superpowers/plans/2026-08-23-m6-theming-persistence-a11y-cli.md # Task 3 �
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.5.0",
@@ -111,7 +111,7 @@ docs/superpowers/plans/2026-08-23-m6-theming-persistence-a11y-cli.md # Task 3 �
 }
 ```
 
-`packages/transport-vercel-ai/vite.config.ts` (no `jsdom`/Svelte — pure Node-testable TS, same pattern as `@chatkit/core`):
+`packages/transport-vercel-ai/vite.config.ts` (no `jsdom`/Svelte — pure Node-testable TS, same pattern as `@chatkit-svelte/core`):
 ```ts
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
@@ -126,7 +126,7 @@ export default defineConfig({
       fileName: 'index',
     },
     rollupOptions: {
-      external: ['@chatkit/core'],
+      external: ['@chatkit-svelte/core'],
     },
   },
   test: {
@@ -189,7 +189,7 @@ describe('createDataStreamParser', () => {
 - [x] **Step 3: Run and confirm failure**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-vercel-ai exec vitest run src/data-stream-parser.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-vercel-ai exec vitest run src/data-stream-parser.test.ts
 ```
 Expected: FAIL — module missing.
 
@@ -242,7 +242,7 @@ export function createDataStreamParser(): DataStreamParser {
 - [x] **Step 5: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-vercel-ai exec vitest run src/data-stream-parser.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-vercel-ai exec vitest run src/data-stream-parser.test.ts
 ```
 Expected: PASS — 6 tests.
 
@@ -304,7 +304,7 @@ export function createBridge<T>(): Bridge<T> {
 ```ts
 import { describe, expect, it } from 'vitest';
 import { toVercelMessages } from './to-vercel-messages';
-import type { Message } from '@chatkit/core';
+import type { Message } from '@chatkit-svelte/core';
 
 describe('toVercelMessages', () => {
   it('concatenates text parts into a single content string per message', () => {
@@ -345,12 +345,12 @@ describe('toVercelMessages', () => {
 - [x] **Step 8: Run and confirm failure, then write `packages/transport-vercel-ai/src/to-vercel-messages.ts`**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-vercel-ai exec vitest run src/to-vercel-messages.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-vercel-ai exec vitest run src/to-vercel-messages.test.ts
 ```
 Expected: FAIL — module missing.
 
 ```ts
-import type { Message } from '@chatkit/core';
+import type { Message } from '@chatkit-svelte/core';
 
 export interface VercelMessage {
   role: string;
@@ -530,14 +530,14 @@ describe('createVercelAiTransport', () => {
 - [x] **Step 10: Run and confirm failure**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-vercel-ai exec vitest run src/vercel-ai-transport.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-vercel-ai exec vitest run src/vercel-ai-transport.test.ts
 ```
 Expected: FAIL — module missing.
 
 - [x] **Step 11: Write `packages/transport-vercel-ai/src/vercel-ai-transport.ts`**
 
 ```ts
-import type { AgentCapabilities, ChatEvent, ChatTransport, RunAgentInput, ToolResult } from '@chatkit/core';
+import type { AgentCapabilities, ChatEvent, ChatTransport, RunAgentInput, ToolResult } from '@chatkit-svelte/core';
 import { createDataStreamParser, type DataStreamPart } from './data-stream-parser';
 import { createBridge } from './bridge';
 import { toVercelMessages } from './to-vercel-messages';
@@ -681,7 +681,7 @@ export function createVercelAiTransport(options: VercelAiTransportOptions): Chat
 - [x] **Step 12: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-vercel-ai exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-vercel-ai exec vitest run
 ```
 Expected: PASS — 15 tests (6 parser + 3 message-mapping + 6 transport; the bridge has no dedicated test file, exercised transitively by the transport tests).
 
@@ -699,21 +699,21 @@ export type { VercelMessage } from './to-vercel-messages';
 - [x] **Step 14: Typecheck and build**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-vercel-ai exec tsc --noEmit
-npx pnpm@9.0.0 --filter @chatkit/transport-vercel-ai build
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-vercel-ai exec tsc --noEmit
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-vercel-ai build
 ```
 Expected: 0 errors; `dist/index.js`/`dist/index.d.ts` produced.
 
 ---
 
-### Task 2: `@chatkit/plugin-devtools`
+### Task 2: `@chatkit-svelte/plugin-devtools`
 
 - [x] **Step 1: Build config**
 
 `packages/plugin-devtools/package.json` (scaffold already has the right shape — add missing devDependencies, same pattern as every other Svelte plugin package this session):
 ```json
 {
-  "name": "@chatkit/plugin-devtools",
+  "name": "@chatkit-svelte/plugin-devtools",
   "version": "0.0.0",
   "description": "Overlay logging raw wire events + live state inspection; export-fixture button that dumps event sequences in the fixture format used by conformance tests.",
   "type": "module",
@@ -735,8 +735,8 @@ Expected: 0 errors; `dist/index.js`/`dist/index.d.ts` produced.
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*",
-    "@chatkit/svelte": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*",
+    "@chatkit-svelte/svelte": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
@@ -752,7 +752,7 @@ Expected: 0 errors; `dist/index.js`/`dist/index.d.ts` produced.
   }
 }
 ```
-`tsconfig.json`/`vite.config.ts`/`vitest-setup.ts` — identical shape to `plugin-forms`'s (Svelte + `@chatkit/core`/`@chatkit/svelte` externalized), not repeated verbatim here.
+`tsconfig.json`/`vite.config.ts`/`vitest-setup.ts` — identical shape to `plugin-forms`'s (Svelte + `@chatkit-svelte/core`/`@chatkit-svelte/svelte` externalized), not repeated verbatim here.
 
 ```bash
 npx pnpm@9.0.0 install
@@ -763,7 +763,7 @@ npx pnpm@9.0.0 install
 ```ts
 import { describe, expect, it } from 'vitest';
 import { createDevtoolsLog } from './log.svelte';
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 describe('createDevtoolsLog', () => {
   it('starts empty', () => {
@@ -792,12 +792,12 @@ describe('createDevtoolsLog', () => {
 - [x] **Step 3: Run and confirm failure, then write `packages/plugin-devtools/src/log.svelte.ts`**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-devtools exec vitest run src/log.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-devtools exec vitest run src/log.test.ts
 ```
 Expected: FAIL — module missing.
 
 ```ts
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 export interface DevtoolsLog {
   readonly events: ChatEvent[];
@@ -829,7 +829,7 @@ Run and confirm pass — 3 tests. (`$state` works standalone here the same way i
 ```ts
 import { describe, expect, it } from 'vitest';
 import { exportFixture } from './export-fixture';
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 describe('exportFixture', () => {
   it('serializes the event log as pretty-printed JSON matching createFixtureTransport\'s expected input shape', () => {
@@ -847,12 +847,12 @@ describe('exportFixture', () => {
 - [x] **Step 5: Run and confirm failure, then write `packages/plugin-devtools/src/export-fixture.ts`**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-devtools exec vitest run src/export-fixture.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-devtools exec vitest run src/export-fixture.test.ts
 ```
 Expected: FAIL — module missing.
 
 ```ts
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 // Matches createFixtureTransport(events)'s expected input shape exactly —
 // paste this file's output straight into a test as
@@ -870,9 +870,9 @@ Run and confirm pass — 1 test.
 `packages/plugin-devtools/src/TestHarness.svelte` (devtools reads the live store via `getChatContext()` for its state panel, so it still needs `<ChatProvider>`, alongside a directly-passed `log`):
 ```svelte
 <script lang="ts">
-  import { ChatProvider } from '@chatkit/svelte';
+  import { ChatProvider } from '@chatkit-svelte/svelte';
   import DevtoolsOverlay from './DevtoolsOverlay.svelte';
-  import type { ChatConfig } from '@chatkit/core';
+  import type { ChatConfig } from '@chatkit-svelte/core';
   import type { DevtoolsLog } from './log.svelte';
 
   interface Props {
@@ -896,8 +896,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import TestHarness from './TestHarness.svelte';
 import { createDevtoolsLog } from './log.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ChatEvent } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 describe('DevtoolsOverlay', () => {
   it('renders one entry per logged event, in order', () => {
@@ -967,7 +967,7 @@ describe('DevtoolsOverlay', () => {
 - [x] **Step 7: Run and confirm failure**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-devtools exec vitest run src/DevtoolsOverlay.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-devtools exec vitest run src/DevtoolsOverlay.test.ts
 ```
 Expected: FAIL — module missing.
 
@@ -975,7 +975,7 @@ Expected: FAIL — module missing.
 
 ```svelte
 <script lang="ts">
-  import { getChatContext } from '@chatkit/svelte';
+  import { getChatContext } from '@chatkit-svelte/svelte';
   import { exportFixture } from './export-fixture';
   import type { DevtoolsLog } from './log.svelte';
 
@@ -1067,8 +1067,8 @@ Expected: FAIL — module missing.
 - [x] **Step 9: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-devtools exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-devtools exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-devtools exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-devtools exec svelte-check --tsconfig ./tsconfig.json
 ```
 Expected: PASS — 9 tests (3 log + 1 export-fixture + 5 DevtoolsOverlay), 0 svelte-check errors/warnings.
 
@@ -1076,7 +1076,7 @@ Expected: PASS — 9 tests (3 log + 1 export-fixture + 5 DevtoolsOverlay), 0 sve
 
 ```ts
 import { createDevtoolsLog, type DevtoolsLog } from './log.svelte';
-import type { ChatPlugin } from '@chatkit/core';
+import type { ChatPlugin } from '@chatkit-svelte/core';
 
 export interface DevtoolsPlugin extends ChatPlugin {
   log: DevtoolsLog;
@@ -1107,16 +1107,16 @@ export { exportFixture } from './export-fixture';
 - [x] **Step 11: Full verification and build**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-devtools exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-devtools exec svelte-check --tsconfig ./tsconfig.json
-npx pnpm@9.0.0 --filter @chatkit/plugin-devtools build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-devtools exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-devtools exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-devtools build
 ```
 
 ---
 
 ### Task 3: CLI catch-up — transport choice + devtools checkbox
 
-Closes the M5/M6 "notes for next plan" commitments now that both `@chatkit/transport-vercel-ai` and `@chatkit/plugin-devtools` exist.
+Closes the M5/M6 "notes for next plan" commitments now that both `@chatkit-svelte/transport-vercel-ai` and `@chatkit-svelte/plugin-devtools` exist.
 
 **Files:**
 - Modify: `packages/cli/src/generate-project.ts`, `generate-project.test.ts`
@@ -1128,24 +1128,24 @@ Closes the M5/M6 "notes for next plan" commitments now that both `@chatkit/trans
 it('defaults to the AG-UI transport when no transport option is given', () => {
   const files = generateProject({ appName: 'app', plugins: [], theme: 'light' });
   const app = files.find((f) => f.path === 'src/App.svelte')!.content;
-  expect(app).toContain('@chatkit/transport-agui');
+  expect(app).toContain('@chatkit-svelte/transport-agui');
 });
 
 it('generates a Vercel AI SDK transport wiring when transport: "vercel-ai" is chosen', () => {
   const files = generateProject({ appName: 'app', plugins: [], theme: 'light', transport: 'vercel-ai' });
   const pkg = JSON.parse(files.find((f) => f.path === 'package.json')!.content);
-  expect(pkg.dependencies['@chatkit/transport-vercel-ai']).toBeDefined();
-  expect(pkg.dependencies['@chatkit/transport-agui']).toBeUndefined();
+  expect(pkg.dependencies['@chatkit-svelte/transport-vercel-ai']).toBeDefined();
+  expect(pkg.dependencies['@chatkit-svelte/transport-agui']).toBeUndefined();
 
   const app = files.find((f) => f.path === 'src/App.svelte')!.content;
-  expect(app).toContain("import { createVercelAiTransport } from '@chatkit/transport-vercel-ai'");
+  expect(app).toContain("import { createVercelAiTransport } from '@chatkit-svelte/transport-vercel-ai'");
   expect(app).toContain('createVercelAiTransport(');
 });
 
 it('offers devtools as a selectable plugin again', () => {
   const files = generateProject({ appName: 'app', plugins: ['devtools'], theme: 'light' });
   const pkg = JSON.parse(files.find((f) => f.path === 'package.json')!.content);
-  expect(pkg.dependencies['@chatkit/plugin-devtools']).toBeDefined();
+  expect(pkg.dependencies['@chatkit-svelte/plugin-devtools']).toBeDefined();
 });
 ```
 
@@ -1178,24 +1178,24 @@ export interface GenerateProjectOptions {
 ```ts
 const PLUGIN_PACKAGES: Record<PluginChoice, { pkg: string; importName: string; factory: string }> = {
   'file-handling': {
-    pkg: '@chatkit/plugin-file-handling',
+    pkg: '@chatkit-svelte/plugin-file-handling',
     importName: 'fileHandlingPlugin',
     factory: 'fileHandlingPlugin({ upload: async (file) => ({ url: URL.createObjectURL(file) }) })',
   },
-  markdown: { pkg: '@chatkit/plugin-markdown', importName: 'markdownPlugin', factory: 'markdownPlugin()' },
-  forms: { pkg: '@chatkit/plugin-forms', importName: 'formsPlugin', factory: 'formsPlugin()' },
-  documents: { pkg: '@chatkit/plugin-documents', importName: 'documentsPlugin', factory: 'documentsPlugin()' },
-  devtools: { pkg: '@chatkit/plugin-devtools', importName: 'devtoolsPlugin', factory: 'devtoolsPlugin()' },
+  markdown: { pkg: '@chatkit-svelte/plugin-markdown', importName: 'markdownPlugin', factory: 'markdownPlugin()' },
+  forms: { pkg: '@chatkit-svelte/plugin-forms', importName: 'formsPlugin', factory: 'formsPlugin()' },
+  documents: { pkg: '@chatkit-svelte/plugin-documents', importName: 'documentsPlugin', factory: 'documentsPlugin()' },
+  devtools: { pkg: '@chatkit-svelte/plugin-devtools', importName: 'devtoolsPlugin', factory: 'devtoolsPlugin()' },
 };
 
 const TRANSPORT_PACKAGES: Record<TransportChoice, { pkg: string; importName: string; factory: string }> = {
   agui: {
-    pkg: '@chatkit/transport-agui',
+    pkg: '@chatkit-svelte/transport-agui',
     importName: 'createAguiTransport',
     factory: "createAguiTransport({ endpoint: '/api/agent' })",
   },
   'vercel-ai': {
-    pkg: '@chatkit/transport-vercel-ai',
+    pkg: '@chatkit-svelte/transport-vercel-ai',
     importName: 'createVercelAiTransport',
     factory: "createVercelAiTransport({ endpoint: '/api/agent' })",
   },
@@ -1206,11 +1206,11 @@ Inside `generateProject`, add:
 ```ts
   const transportChoice = TRANSPORT_PACKAGES[options.transport ?? 'agui'];
 ```
-Replace the `dependencies` object's fixed `'@chatkit/transport-agui': '^0.0.0'` line with `[transportChoice.pkg]: '^0.0.0'`.
+Replace the `dependencies` object's fixed `'@chatkit-svelte/transport-agui': '^0.0.0'` line with `[transportChoice.pkg]: '^0.0.0'`.
 
 Replace both `appSvelte` branches' fixed lines:
 ```ts
-  import { createAguiTransport } from '@chatkit/transport-agui';
+  import { createAguiTransport } from '@chatkit-svelte/transport-agui';
 ```
 and
 ```ts
@@ -1252,7 +1252,7 @@ npx pnpm@9.0.0 --filter create-chatkit build
 ```bash
 printf 'smoke-test-app\n\n\nvercel-ai\n\n' | node packages/cli/dist/index.js
 ```
-(run from a scratch temp directory, same as the M6 plan's Step 10 — generate, spot-check `package.json`'s dependencies include `@chatkit/transport-vercel-ai` and `src/App.svelte` imports `createVercelAiTransport`, then delete the scratch directory.)
+(run from a scratch temp directory, same as the M6 plan's Step 10 — generate, spot-check `package.json`'s dependencies include `@chatkit-svelte/transport-vercel-ai` and `src/App.svelte` imports `createVercelAiTransport`, then delete the scratch directory.)
 
 - [x] **Step 7: Close out the M5/M6 plan notes**
 
@@ -1265,17 +1265,17 @@ In `docs/superpowers/plans/2026-08-23-m6-theming-persistence-a11y-cli.md`'s "Not
 - [x] **Step 1: Rebuild all 12 packages in dependency order**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core build
-npx pnpm@9.0.0 --filter @chatkit/transport-agui build
-npx pnpm@9.0.0 --filter @chatkit/transport-vercel-ai build
-npx pnpm@9.0.0 --filter @chatkit/svelte build
-npx pnpm@9.0.0 --filter @chatkit/ui build
-npx pnpm@9.0.0 --filter @chatkit/plugin-tool-render build
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown build
-npx pnpm@9.0.0 --filter @chatkit/plugin-file-handling build
-npx pnpm@9.0.0 --filter @chatkit/plugin-forms build
-npx pnpm@9.0.0 --filter @chatkit/plugin-documents build
-npx pnpm@9.0.0 --filter @chatkit/plugin-devtools build
+npx pnpm@9.0.0 --filter @chatkit-svelte/core build
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui build
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-vercel-ai build
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte build
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-tool-render build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-file-handling build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-forms build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-documents build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-devtools build
 npx pnpm@9.0.0 --filter create-chatkit build
 ```
 

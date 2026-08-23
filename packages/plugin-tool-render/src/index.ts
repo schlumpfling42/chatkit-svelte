@@ -1,5 +1,5 @@
 import ToolCallCard from './ToolCallCard.svelte';
-import type { ChatPlugin } from '@chatkit/core';
+import type { ChatPlugin } from '@chatkit-svelte/core';
 
 /**
  * Registers ToolCallCard as the '*' wildcard toolRenderer — applies to any

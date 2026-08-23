@@ -1,6 +1,6 @@
 import DocumentCanvas from './DocumentCanvas.svelte';
 import { documentArtifactReducer } from './artifact-reducer';
-import type { ChatPlugin } from '@chatkit/core';
+import type { ChatPlugin } from '@chatkit-svelte/core';
 import type { ExportHandlers } from './types';
 
 export interface DocumentsPluginOptions {

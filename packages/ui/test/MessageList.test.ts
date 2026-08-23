@@ -3,8 +3,8 @@ import { render, screen, waitFor } from '@testing-library/svelte';
 import MessageListHarness from './MessageListHarness.svelte';
 import CustomTextRenderer from './test-fixtures/CustomTextRenderer.svelte';
 import CustomToolRenderer from './test-fixtures/CustomToolRenderer.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ChatEvent, ChatPlugin } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ChatEvent, ChatPlugin } from '@chatkit-svelte/core';
 
 describe('MessageList — registry-aware rendering', () => {
   it('renders text via the built-in <p> when no plugin registers a text renderer', async () => {

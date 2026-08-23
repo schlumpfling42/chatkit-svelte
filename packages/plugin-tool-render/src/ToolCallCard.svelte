@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ContentPart } from '@chatkit/core';
+  import type { ContentPart } from '@chatkit-svelte/core';
 
   interface Props {
     toolCall: ContentPart & { type: 'tool_call' };

@@ -1,5 +1,5 @@
-import { applyPatch } from '@chatkit/core';
-import type { AgentCapabilities, ChatEvent, ChatTransport, RunAgentInput, ToolResult } from '@chatkit/core';
+import { applyPatch } from '@chatkit-svelte/core';
+import type { AgentCapabilities, ChatEvent, ChatTransport, RunAgentInput, ToolResult } from '@chatkit-svelte/core';
 import { createSseFrameParser } from './sse-parser';
 import { computeBackoffDelay, type BackoffOptions } from './backoff';
 import { BoundedEventQueue } from './event-queue';

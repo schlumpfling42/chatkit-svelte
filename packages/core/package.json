@@ -1,5 +1,5 @@
 {
-  "name": "@chatkit/core",
+  "name": "@chatkit-svelte/core",
   "version": "0.1.0",
   "license": "MIT",
   "description": "Framework-agnostic transport contracts, reducer, plugin host, types, JSON Patch. No Svelte, no DOM.",

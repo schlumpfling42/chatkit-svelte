@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getChatContext } from '@chatkit/svelte';
+  import { getChatContext } from '@chatkit-svelte/svelte';
   import { exportFixture } from './export-fixture';
   import type { DevtoolsLog } from './log.svelte';
 

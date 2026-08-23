@@ -1,6 +1,6 @@
-import { needsApproval, reduceEvent, initialState, directionForLocale, translate } from '@chatkit/core';
-import { createPluginHost } from '@chatkit/core';
-import type { ChatConfig, ChatEvent, ContentPart, Message, PluginContext, RunAgentInput, ToolResult, UserInput } from '@chatkit/core';
+import { needsApproval, reduceEvent, initialState, directionForLocale, translate } from '@chatkit-svelte/core';
+import { createPluginHost } from '@chatkit-svelte/core';
+import type { ChatConfig, ChatEvent, ContentPart, Message, PluginContext, RunAgentInput, ToolResult, UserInput } from '@chatkit-svelte/core';
 
 type ToolCallPart = ContentPart & { type: 'tool_call' };
 

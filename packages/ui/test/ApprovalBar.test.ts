@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import TestHarness from './TestHarness.svelte';
 import ApprovalBarHarness from './ApprovalBarHarness.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ChatEvent } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 function toolCallEvents(): ChatEvent[] {
   return [

@@ -1,5 +1,5 @@
 import { createDevtoolsLog, type DevtoolsLog } from './log.svelte';
-import type { ChatPlugin } from '@chatkit/core';
+import type { ChatPlugin } from '@chatkit-svelte/core';
 
 export interface DevtoolsPlugin extends ChatPlugin {
   log: DevtoolsLog;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { exportDocument } from '../src/export';
-import type { ArtifactRecord } from '@chatkit/core';
+import type { ArtifactRecord } from '@chatkit-svelte/core';
 
 function makeArtifact(content: string): ArtifactRecord {
   return {

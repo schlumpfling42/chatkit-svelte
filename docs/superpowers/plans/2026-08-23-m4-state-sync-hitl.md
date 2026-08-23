@@ -82,7 +82,7 @@ describe('needsApproval', () => {
 - [x] **Step 2: Run and confirm failure**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run src/human-in-the-loop.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run src/human-in-the-loop.test.ts
 ```
 Expected: FAIL — `Cannot find module './human-in-the-loop'`.
 
@@ -139,8 +139,8 @@ export type { FixtureTransportOptions, FixtureTransportRecorder } from './testin
 - [x] **Step 6: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/core exec tsc --noEmit
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec tsc --noEmit
 ```
 Expected: PASS — 38 tests (33 existing + 5 new), 0 type errors.
 
@@ -154,7 +154,7 @@ Expected: PASS — 38 tests (33 existing + 5 new), 0 type errors.
 
 - [x] **Step 1: Write the failing tests**
 
-Add these to `packages/svelte/src/chat-store.test.ts`. The file needs `ChatPlugin` added to its `@chatkit/core` type import alongside the existing `ChatEvent` import.
+Add these to `packages/svelte/src/chat-store.test.ts`. The file needs `ChatPlugin` added to its `@chatkit-svelte/core` type import alongside the existing `ChatEvent` import.
 
 ```ts
 describe('sharedState and activities getters', () => {
@@ -360,16 +360,16 @@ describe('human-in-the-loop approval flow', () => {
 - [x] **Step 2: Run and confirm failure**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/svelte exec vitest run src/chat-store.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte exec vitest run src/chat-store.test.ts
 ```
 Expected: FAIL — `store.sharedState`/`store.activities`/`store.pendingApprovals`/`store.approveToolCall` etc. are `undefined`.
 
 - [x] **Step 3: Write the full updated `packages/svelte/src/chat-store.svelte.ts`**
 
 ```ts
-import { needsApproval, reduceEvent, initialState } from '@chatkit/core';
-import { createPluginHost } from '@chatkit/core';
-import type { ChatConfig, ChatEvent, ContentPart, Message, PluginContext, RunAgentInput, ToolResult, UserInput } from '@chatkit/core';
+import { needsApproval, reduceEvent, initialState } from '@chatkit-svelte/core';
+import { createPluginHost } from '@chatkit-svelte/core';
+import type { ChatConfig, ChatEvent, ContentPart, Message, PluginContext, RunAgentInput, ToolResult, UserInput } from '@chatkit-svelte/core';
 
 type ToolCallPart = ContentPart & { type: 'tool_call' };
 
@@ -582,8 +582,8 @@ Note on `settleApprovalRunStatus`: it's called after both the reject path and th
 - [x] **Step 4: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/svelte exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/svelte exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte exec svelte-check --tsconfig ./tsconfig.json
 ```
 Expected: PASS — 19 tests (10 existing + 2 getters + 7 approval-flow), 0 svelte-check errors/warnings.
 
@@ -605,8 +605,8 @@ Reuses the existing `TestHarness.svelte` (wraps `ChatProvider` + `ChatWindow`, f
 import { describe, expect, it } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import TestHarness from './TestHarness.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ChatEvent } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 function toolCallEvents(): ChatEvent[] {
   return [
@@ -690,7 +690,7 @@ describe('ApprovalBar (via ChatWindow)', () => {
 - [x] **Step 2: Run and confirm failure**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/ui exec vitest run src/ApprovalBar.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec vitest run src/ApprovalBar.test.ts
 ```
 Expected: FAIL — no `approval` testid exists yet (ChatWindow doesn't render an ApprovalBar).
 
@@ -698,7 +698,7 @@ Expected: FAIL — no `approval` testid exists yet (ChatWindow doesn't render an
 
 ```svelte
 <script lang="ts">
-  import { getChatContext } from '@chatkit/svelte';
+  import { getChatContext } from '@chatkit-svelte/svelte';
 
   const store = getChatContext();
   let editingId: string | null = $state(null);
@@ -811,7 +811,7 @@ Full file content:
   import Composer from './Composer.svelte';
   import ApprovalBar from './ApprovalBar.svelte';
   import type { Snippet } from 'svelte';
-  import type { Message } from '@chatkit/core';
+  import type { Message } from '@chatkit-svelte/core';
 
   interface Props {
     message?: Snippet<[Message]>;
@@ -854,8 +854,8 @@ export { default as ApprovalBar } from './ApprovalBar.svelte';
 - [x] **Step 6: Run and confirm pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/ui exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/ui exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec svelte-check --tsconfig ./tsconfig.json
 ```
 Expected: PASS — 16 tests (11 existing + 5 new), 0 svelte-check errors/warnings. The two pre-existing `ChatWindow.test.ts` tests are unaffected — they don't configure `humanInTheLoop`, so `pendingApprovals` is always empty and `<ApprovalBar>` renders nothing for them.
 
@@ -863,31 +863,31 @@ Expected: PASS — 16 tests (11 existing + 5 new), 0 svelte-check errors/warning
 
 ### Task 4: Externalize workspace deps in any new build config, full rebuild, and final review
 
-M4 touches no *new* packages (`ui`/`svelte`/`core` already exist with `vite.config.ts` files that — per the M3 fix — already externalize their `@chatkit/*` workspace dependencies correctly), so there's no new externalization gap to introduce here. This task is a rebuild-and-verify pass, not a fix.
+M4 touches no *new* packages (`ui`/`svelte`/`core` already exist with `vite.config.ts` files that — per the M3 fix — already externalize their `@chatkit-svelte/*` workspace dependencies correctly), so there's no new externalization gap to introduce here. This task is a rebuild-and-verify pass, not a fix.
 
 - [x] **Step 1: Rebuild in dependency order**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core build
-npx pnpm@9.0.0 --filter @chatkit/transport-agui build
-npx pnpm@9.0.0 --filter @chatkit/svelte build
-npx pnpm@9.0.0 --filter @chatkit/ui build
-npx pnpm@9.0.0 --filter @chatkit/plugin-tool-render build
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown build
-npx pnpm@9.0.0 --filter @chatkit/plugin-file-handling build
+npx pnpm@9.0.0 --filter @chatkit-svelte/core build
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui build
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte build
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-tool-render build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-file-handling build
 ```
 Expected: all succeed.
 
 - [x] **Step 2: Full regression suite across all 7 packages**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/svelte exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/ui exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-tool-render exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-file-handling exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-tool-render exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-file-handling exec vitest run
 ```
 Expected: 38 / 44 / 19 / 16 / 4 / 21 / 5 = 147 tests passing, no regressions in the 5 untouched packages.
 
@@ -908,7 +908,7 @@ to:
 
 - M5 is forms & documents (spec §14), which reuses this milestone's `awaiting_approval` status/`<ApprovalBar>`-adjacent pattern for form/document submission approval (spec §10's last bullet: "Document and form artifacts that require explicit user submission/approval before being sent back to the agent reuse this same `awaiting_approval` status rather than inventing a parallel state machine"). Expect M5 to add `artifactReducers` (already typed in `plugin-host.ts` since M0, unused until now) and `<FormRenderer>`/`<DocumentCanvas>` components, not to touch this milestone's approval flow itself.
 - The known `PluginHost.runHook` multi-plugin `onToolCall` chaining wrinkle (noted above) is still open — worth fixing whenever a milestone first needs two plugins registering `onToolCall` for different tools at once.
-- `<ApprovalBar>`'s edit affordance is deliberately minimal (a raw JSON textarea, silently keeping the editor open on invalid JSON) — a real UX pass belongs in M6 (theming/polish), same as the rest of `@chatkit/ui`'s current styling.
+- `<ApprovalBar>`'s edit affordance is deliberately minimal (a raw JSON textarea, silently keeping the editor open on invalid JSON) — a real UX pass belongs in M6 (theming/polish), same as the rest of `@chatkit-svelte/ui`'s current styling.
 
 ---
 

@@ -28,13 +28,13 @@ describe('generateProject', () => {
   it('adds a dependency and an import for each selected plugin', () => {
     const files = generateProject({ appName: 'app', plugins: ['markdown', 'forms'], theme: 'light' });
     const pkg = JSON.parse(files.find((f) => f.path === 'package.json')!.content);
-    expect(pkg.dependencies['@chatkit/plugin-markdown']).toBeDefined();
-    expect(pkg.dependencies['@chatkit/plugin-forms']).toBeDefined();
-    expect(pkg.dependencies['@chatkit/plugin-documents']).toBeUndefined();
+    expect(pkg.dependencies['@chatkit-svelte/plugin-markdown']).toBeDefined();
+    expect(pkg.dependencies['@chatkit-svelte/plugin-forms']).toBeDefined();
+    expect(pkg.dependencies['@chatkit-svelte/plugin-documents']).toBeUndefined();
 
     const configFile = files.find((f) => f.path === 'src/chatkit.config.ts')!.content;
-    expect(configFile).toContain("import { markdownPlugin } from '@chatkit/plugin-markdown'");
-    expect(configFile).toContain("import { formsPlugin } from '@chatkit/plugin-forms'");
+    expect(configFile).toContain("import { markdownPlugin } from '@chatkit-svelte/plugin-markdown'");
+    expect(configFile).toContain("import { formsPlugin } from '@chatkit-svelte/plugin-forms'");
     expect(configFile).not.toContain('plugin-documents');
   });
 
@@ -55,24 +55,24 @@ describe('generateProject', () => {
   it('defaults to the AG-UI transport when no transport option is given', () => {
     const files = generateProject({ appName: 'app', plugins: [], theme: 'light' });
     const app = files.find((f) => f.path === 'src/App.svelte')!.content;
-    expect(app).toContain('@chatkit/transport-agui');
+    expect(app).toContain('@chatkit-svelte/transport-agui');
   });
 
   it('generates a Vercel AI SDK transport wiring when transport: "vercel-ai" is chosen', () => {
     const files = generateProject({ appName: 'app', plugins: [], theme: 'light', transport: 'vercel-ai' });
     const pkg = JSON.parse(files.find((f) => f.path === 'package.json')!.content);
-    expect(pkg.dependencies['@chatkit/transport-vercel-ai']).toBeDefined();
-    expect(pkg.dependencies['@chatkit/transport-agui']).toBeUndefined();
+    expect(pkg.dependencies['@chatkit-svelte/transport-vercel-ai']).toBeDefined();
+    expect(pkg.dependencies['@chatkit-svelte/transport-agui']).toBeUndefined();
 
     const app = files.find((f) => f.path === 'src/App.svelte')!.content;
-    expect(app).toContain("import { createVercelAiTransport } from '@chatkit/transport-vercel-ai'");
+    expect(app).toContain("import { createVercelAiTransport } from '@chatkit-svelte/transport-vercel-ai'");
     expect(app).toContain('createVercelAiTransport(');
   });
 
   it('offers devtools as a selectable plugin again', () => {
     const files = generateProject({ appName: 'app', plugins: ['devtools'], theme: 'light' });
     const pkg = JSON.parse(files.find((f) => f.path === 'package.json')!.content);
-    expect(pkg.dependencies['@chatkit/plugin-devtools']).toBeDefined();
+    expect(pkg.dependencies['@chatkit-svelte/plugin-devtools']).toBeDefined();
   });
 
   it('generates a dev server matching the chosen transport\'s wire format', () => {

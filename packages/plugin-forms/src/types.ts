@@ -1,4 +1,4 @@
-import type { JSONSchema } from '@chatkit/core';
+import type { JSONSchema } from '@chatkit-svelte/core';
 
 export type FormFieldWidget = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'date' | 'file' | 'slider';
 

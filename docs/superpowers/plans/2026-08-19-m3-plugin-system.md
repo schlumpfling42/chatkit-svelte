@@ -4,7 +4,7 @@
 >
 > **Git note:** commit steps are intentionally omitted — the repo owner handles git operations manually. Do not run `git add`/`git commit` while executing this plan unless explicitly asked to in the moment.
 
-**Goal:** Build the three baseline plugins from spec §13 — `plugin-tool-render`, `plugin-markdown`, `plugin-file-handling` — and make `@chatkit/ui`'s `<MessageList>`/`<Composer>` genuinely **plugin-aware**: consulting `store.registry.messageRenderers`/`toolRenderers`/`attachmentHandlers` (all already built in M0's `createPluginHost`) instead of hardcoding behavior, so these three plugins (and any future one) just *register* into a mechanism that already exists rather than requiring bespoke UI wiring per plugin.
+**Goal:** Build the three baseline plugins from spec §13 — `plugin-tool-render`, `plugin-markdown`, `plugin-file-handling` — and make `@chatkit-svelte/ui`'s `<MessageList>`/`<Composer>` genuinely **plugin-aware**: consulting `store.registry.messageRenderers`/`toolRenderers`/`attachmentHandlers` (all already built in M0's `createPluginHost`) instead of hardcoding behavior, so these three plugins (and any future one) just *register* into a mechanism that already exists rather than requiring bespoke UI wiring per plugin.
 
 **Architecture:** M2's "Notes for M3" called this out directly: `<MessageList>`'s hardcoded `text`-only branch becomes a *fallback* that only fires when no plugin has registered a `messageRenderer` for a given content-part type; a new fallback for `tool_call` parts (currently not rendered *at all*) does the same against `toolRenderers`. Both lookups use `{@const}` + a dynamically-referenced component (`<Comp {...props} />`, Svelte 5's supported pattern for rendering a runtime-selected component — verified against a real registry map, not assumed) rather than `<svelte:component>`. `<Composer>` gains a generic attachment mechanism gated on `store.registry.attachmentHandlers.length > 0` — it has no plugin-specific code, it just offers a file picker, matches the picked file's MIME type against whichever handlers are registered, and calls the matching one.
 
@@ -67,11 +67,11 @@ Generic fallback tool-call visualization — a collapsible `<details>`/`<summary
 
 - [ ] **Step 1: Update `packages/plugin-tool-render/package.json`**
 
-The file already exists (initial scaffolding) with a `svelte`/`typescript`/`vite`/`vitest` devDependency set and `@chatkit/core` as a dependency, but no `svelte-check`, `@sveltejs/vite-plugin-svelte`, `vite-plugin-dts`, or testing-library packages — add them, matching the pattern already established in `packages/svelte` and `packages/ui`:
+The file already exists (initial scaffolding) with a `svelte`/`typescript`/`vite`/`vitest` devDependency set and `@chatkit-svelte/core` as a dependency, but no `svelte-check`, `@sveltejs/vite-plugin-svelte`, `vite-plugin-dts`, or testing-library packages — add them, matching the pattern already established in `packages/svelte` and `packages/ui`:
 
 ```json
 {
-  "name": "@chatkit/plugin-tool-render",
+  "name": "@chatkit-svelte/plugin-tool-render",
   "version": "0.0.0",
   "description": "Generic fallback tool-call visualization (collapsible args/result JSON view) for any tool without a custom toolRenderer registered.",
   "type": "module",
@@ -93,7 +93,7 @@ The file already exists (initial scaffolding) with a `svelte`/`typescript`/`vite
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
@@ -179,7 +179,7 @@ npx pnpm@9.0.0 install
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import ToolCallCard from './ToolCallCard.svelte';
-import type { ContentPart } from '@chatkit/core';
+import type { ContentPart } from '@chatkit-svelte/core';
 
 function toolCall(overrides: Partial<ContentPart & { type: 'tool_call' }> = {}): ContentPart & { type: 'tool_call' } {
   return {
@@ -219,7 +219,7 @@ describe('ToolCallCard', () => {
 - [ ] **Step 7: Run the tests and confirm they fail**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-tool-render exec vitest run src/ToolCallCard.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-tool-render exec vitest run src/ToolCallCard.test.ts
 ```
 Expected: FAIL — `Cannot find module './ToolCallCard.svelte'`.
 
@@ -227,7 +227,7 @@ Expected: FAIL — `Cannot find module './ToolCallCard.svelte'`.
 
 ```svelte
 <script lang="ts">
-  import type { ContentPart } from '@chatkit/core';
+  import type { ContentPart } from '@chatkit-svelte/core';
 
   interface Props {
     toolCall: ContentPart & { type: 'tool_call' };
@@ -279,7 +279,7 @@ Expected: FAIL — `Cannot find module './ToolCallCard.svelte'`.
 - [ ] **Step 9: Run the tests and confirm they pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-tool-render exec vitest run src/ToolCallCard.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-tool-render exec vitest run src/ToolCallCard.test.ts
 ```
 Expected: PASS — 4 tests.
 
@@ -287,7 +287,7 @@ Expected: PASS — 4 tests.
 
 ```ts
 import ToolCallCard from './ToolCallCard.svelte';
-import type { ChatPlugin } from '@chatkit/core';
+import type { ChatPlugin } from '@chatkit-svelte/core';
 
 /**
  * Registers ToolCallCard as the '*' wildcard toolRenderer — applies to any
@@ -308,7 +308,7 @@ export { default as ToolCallCard } from './ToolCallCard.svelte';
 - [ ] **Step 11: Typecheck and confirm no errors**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-tool-render exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-tool-render exec svelte-check --tsconfig ./tsconfig.json
 ```
 Expected: `0 ERRORS 0 WARNINGS`.
 
@@ -336,7 +336,7 @@ The file already exists with `shiki` listed as a dependency from initial scaffol
 
 ```json
 {
-  "name": "@chatkit/plugin-markdown",
+  "name": "@chatkit-svelte/plugin-markdown",
   "version": "0.0.0",
   "description": "Streaming-safe markdown renderer: parses to a restricted AST and renders via real Svelte elements, no {@html}. Syntax highlighting is not yet wired up (see plan notes).",
   "type": "module",
@@ -358,7 +358,7 @@ The file already exists with `shiki` listed as a dependency from initial scaffol
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
@@ -520,7 +520,7 @@ describe('parseBlocks', () => {
 - [ ] **Step 7: Run the tests and confirm they fail**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown exec vitest run src/markdown-parser.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown exec vitest run src/markdown-parser.test.ts
 ```
 Expected: FAIL — `Cannot find module './markdown-parser'`.
 
@@ -601,7 +601,7 @@ export function parseBlocks(source: string): BlockNode[] {
 - [ ] **Step 9: Run the tests and confirm they pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown exec vitest run src/markdown-parser.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown exec vitest run src/markdown-parser.test.ts
 ```
 Expected: PASS — 14 tests.
 
@@ -647,7 +647,7 @@ Add these two tests to `packages/plugin-markdown/src/markdown-parser.test.ts`, i
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown exec vitest run src/markdown-parser.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown exec vitest run src/markdown-parser.test.ts
 ```
 Expected: PASS — 16 tests (14 original + these 2). Should complete in a couple of seconds — if it hangs, the fix didn't take.
 
@@ -734,7 +734,7 @@ describe('Markdown', () => {
 - [ ] **Step 12: Run the tests and confirm they fail**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown exec vitest run src/Markdown.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown exec vitest run src/Markdown.test.ts
 ```
 Expected: FAIL — `Cannot find module './Markdown.svelte'`.
 
@@ -746,7 +746,7 @@ The prop is `part: ContentPart` (matching `MessageRendererRegistration`'s callin
 <script lang="ts">
   import { parseBlocks } from './markdown-parser';
   import InlineNode from './InlineNode.svelte';
-  import type { ContentPart } from '@chatkit/core';
+  import type { ContentPart } from '@chatkit-svelte/core';
 
   interface Props {
     part: ContentPart & { type: 'text' };
@@ -795,7 +795,7 @@ Note: the Task 11 test passes `part` (matching this signature), not `source` —
 - [ ] **Step 14: Run the tests and confirm they pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown exec vitest run src/Markdown.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown exec vitest run src/Markdown.test.ts
 ```
 Expected: PASS — 5 tests.
 
@@ -803,7 +803,7 @@ Expected: PASS — 5 tests.
 
 ```ts
 import Markdown from './Markdown.svelte';
-import type { ChatPlugin } from '@chatkit/core';
+import type { ChatPlugin } from '@chatkit-svelte/core';
 
 /**
  * Registers Markdown as the messageRenderer for 'text' content parts, taking
@@ -825,7 +825,7 @@ export type { BlockNode, InlineNode } from './markdown-parser';
 - [ ] **Step 16: Typecheck and confirm no errors**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown exec svelte-check --tsconfig ./tsconfig.json
 ```
 Expected: `0 ERRORS 0 WARNINGS`.
 
@@ -850,7 +850,7 @@ The attachment pipeline: validates a picked file, calls a consumer-supplied `upl
 
 ```json
 {
-  "name": "@chatkit/plugin-file-handling",
+  "name": "@chatkit-svelte/plugin-file-handling",
   "version": "0.0.0",
   "description": "Attachment pipeline (validate/upload) and file & image message renderers. Drag-drop/paste input transforms are a documented fast-follow, not included in this milestone.",
   "type": "module",
@@ -872,7 +872,7 @@ The attachment pipeline: validates a picked file, calls a consumer-supplied `upl
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
@@ -958,7 +958,7 @@ No TDD cycle for this trivial rendering component alone — it's exercised via S
 
 ```svelte
 <script lang="ts">
-  import type { ContentPart } from '@chatkit/core';
+  import type { ContentPart } from '@chatkit-svelte/core';
 
   interface Props {
     part: ContentPart & { type: 'file' };
@@ -987,7 +987,7 @@ No TDD cycle for this trivial rendering component alone — it's exercised via S
 
 ```svelte
 <script lang="ts">
-  import type { ContentPart } from '@chatkit/core';
+  import type { ContentPart } from '@chatkit-svelte/core';
 
   interface Props {
     part: ContentPart & { type: 'image' };
@@ -1069,7 +1069,7 @@ describe('fileHandlingPlugin', () => {
 - [ ] **Step 9: Run the tests and confirm they fail**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-file-handling exec vitest run src/file-handling-plugin.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-file-handling exec vitest run src/file-handling-plugin.test.ts
 ```
 Expected: FAIL — `Cannot find module './file-handling-plugin'`.
 
@@ -1078,7 +1078,7 @@ Expected: FAIL — `Cannot find module './file-handling-plugin'`.
 ```ts
 import FileRenderer from './FileRenderer.svelte';
 import ImageRenderer from './ImageRenderer.svelte';
-import type { ChatPlugin, ContentPart } from '@chatkit/core';
+import type { ChatPlugin, ContentPart } from '@chatkit-svelte/core';
 
 export interface FileHandlingOptions {
   /** MIME type patterns accepted, e.g. 'image/*' or 'application/pdf'. Default: images, PDFs, text files. */
@@ -1099,7 +1099,7 @@ export function fileHandlingPlugin(opts: FileHandlingOptions): ChatPlugin {
         maxSizeBytes: opts.maxSizeBytes ?? 25 * 1024 * 1024,
         async process(file, ctx): Promise<ContentPart> {
           // AttachmentHandler.process's `file` parameter is typed structurally
-          // ({ name, type, size }) by @chatkit/core so the plugin-host contract
+          // ({ name, type, size }) by @chatkit-svelte/core so the plugin-host contract
           // stays DOM-independent; at runtime it's always the real browser
           // File object Composer.svelte passes through (Task 5), which
           // `opts.upload` needs directly (to read its bytes) — hence the cast.
@@ -1122,7 +1122,7 @@ export function fileHandlingPlugin(opts: FileHandlingOptions): ChatPlugin {
 - [ ] **Step 11: Run the tests and confirm they pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-file-handling exec vitest run src/file-handling-plugin.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-file-handling exec vitest run src/file-handling-plugin.test.ts
 ```
 Expected: PASS — 5 tests.
 
@@ -1138,7 +1138,7 @@ export { default as ImageRenderer } from './ImageRenderer.svelte';
 - [ ] **Step 13: Typecheck and confirm no errors**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-file-handling exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-file-handling exec svelte-check --tsconfig ./tsconfig.json
 ```
 Expected: `0 ERRORS 0 WARNINGS`.
 
@@ -1160,9 +1160,9 @@ Svelte context (`setChatContext`/`getChatContext`) only works within a component
 
 ```svelte
 <script lang="ts">
-  import { createChatStore, setChatContext } from '@chatkit/svelte';
+  import { createChatStore, setChatContext } from '@chatkit-svelte/svelte';
   import MessageList from './MessageList.svelte';
-  import type { ChatConfig } from '@chatkit/core';
+  import type { ChatConfig } from '@chatkit-svelte/core';
   import { untrack } from 'svelte';
 
   interface Props {
@@ -1182,7 +1182,7 @@ Svelte context (`setChatContext`/`getChatContext`) only works within a component
 `packages/ui/src/test-fixtures/CustomTextRenderer.svelte`:
 ```svelte
 <script lang="ts">
-  import type { ContentPart } from '@chatkit/core';
+  import type { ContentPart } from '@chatkit-svelte/core';
   interface Props {
     part: ContentPart & { type: 'text' };
   }
@@ -1195,7 +1195,7 @@ Svelte context (`setChatContext`/`getChatContext`) only works within a component
 `packages/ui/src/test-fixtures/CustomToolRenderer.svelte`:
 ```svelte
 <script lang="ts">
-  import type { ContentPart } from '@chatkit/core';
+  import type { ContentPart } from '@chatkit-svelte/core';
   interface Props {
     toolCall: ContentPart & { type: 'tool_call' };
   }
@@ -1213,8 +1213,8 @@ import { render, screen, waitFor } from '@testing-library/svelte';
 import MessageListHarness from './MessageListHarness.svelte';
 import CustomTextRenderer from './test-fixtures/CustomTextRenderer.svelte';
 import CustomToolRenderer from './test-fixtures/CustomToolRenderer.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ChatEvent, ChatPlugin } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ChatEvent, ChatPlugin } from '@chatkit-svelte/core';
 
 describe('MessageList — registry-aware rendering', () => {
   it('renders text via the built-in <p> when no plugin registers a text renderer', async () => {
@@ -1316,7 +1316,7 @@ describe('MessageList — registry-aware rendering', () => {
 - [ ] **Step 4: Run the tests and confirm they fail**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/ui exec vitest run src/MessageList.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec vitest run src/MessageList.test.ts
 ```
 Expected: FAIL — the current `MessageList.svelte` has no tool-call handling at all (so the tool-call tests fail with "Unable to find element"), and no registry consultation for `text` (so the custom-renderer tests fail the same way).
 
@@ -1326,9 +1326,9 @@ Full file content (replace the entire file with this):
 
 ```svelte
 <script lang="ts">
-  import { getChatContext } from '@chatkit/svelte';
+  import { getChatContext } from '@chatkit-svelte/svelte';
   import type { Snippet, Component } from 'svelte';
-  import type { ContentPart, Message } from '@chatkit/core';
+  import type { ContentPart, Message } from '@chatkit-svelte/core';
 
   interface Props {
     message?: Snippet<[Message]>;
@@ -1338,7 +1338,7 @@ Full file content (replace the entire file with this):
   const store = getChatContext();
 
   // The plugin registry stores renderer components as `unknown` in
-  // @chatkit/core (deliberately — core has no Svelte dependency, see spec
+  // @chatkit-svelte/core (deliberately — core has no Svelte dependency, see spec
   // §2). This is the trust boundary where that gets cast back to a concrete
   // Svelte Component type: plugin authors are responsible for matching the
   // { part } / { toolCall } prop shape a registration implies.
@@ -1422,14 +1422,14 @@ Full file content (replace the entire file with this):
 - [ ] **Step 6: Run the tests and confirm they pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/ui exec vitest run src/MessageList.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec vitest run src/MessageList.test.ts
 ```
 Expected: PASS — 5 tests.
 
 - [ ] **Step 7: Re-run `ChatWindow.test.ts` to confirm the refactor didn't regress the plugin-free path**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/ui exec vitest run src/ChatWindow.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec vitest run src/ChatWindow.test.ts
 ```
 Expected: PASS — still 2 tests (unchanged from M2).
 
@@ -1502,7 +1502,7 @@ Add this test to `packages/svelte/src/chat-store.test.ts`, inside the existing `
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/svelte exec vitest run src/chat-store.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte exec vitest run src/chat-store.test.ts
 ```
 Expected: PASS — 7 tests (6 previous + this one). The pre-existing `'sendMessage appends a user message and calls transport.sendRun'` test (which sends non-empty text) is unaffected by this change — confirm it still passes too.
 
@@ -1510,9 +1510,9 @@ Expected: PASS — 7 tests (6 previous + this one). The pre-existing `'sendMessa
 
 ```svelte
 <script lang="ts">
-  import { createChatStore, setChatContext } from '@chatkit/svelte';
+  import { createChatStore, setChatContext } from '@chatkit-svelte/svelte';
   import Composer from './Composer.svelte';
-  import type { ChatConfig } from '@chatkit/core';
+  import type { ChatConfig } from '@chatkit-svelte/core';
   import { untrack } from 'svelte';
 
   interface Props {
@@ -1533,8 +1533,8 @@ Expected: PASS — 7 tests (6 previous + this one). The pre-existing `'sendMessa
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import ComposerHarness from './ComposerHarness.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ChatPlugin } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ChatPlugin } from '@chatkit-svelte/core';
 
 describe('Composer — attachments', () => {
   it('does not show an attach button when no attachmentHandlers are registered', () => {
@@ -1606,7 +1606,7 @@ describe('Composer — attachments', () => {
 - [ ] **Step 4: Run the tests and confirm they fail**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/ui exec vitest run src/Composer.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec vitest run src/Composer.test.ts
 ```
 Expected: FAIL — the current `Composer.svelte` has no attachment button or file input at all.
 
@@ -1616,8 +1616,8 @@ Full file content (replace the entire file with this):
 
 ```svelte
 <script lang="ts">
-  import { getChatContext } from '@chatkit/svelte';
-  import type { ContentPart } from '@chatkit/core';
+  import { getChatContext } from '@chatkit-svelte/svelte';
+  import type { ContentPart } from '@chatkit-svelte/core';
 
   const store = getChatContext();
   let text = $state('');
@@ -1718,14 +1718,14 @@ The file input is visually hidden (clip-based, not `display: none`) rather than 
 - [ ] **Step 6: Run the tests and confirm they pass**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/ui exec vitest run src/Composer.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec vitest run src/Composer.test.ts
 ```
 Expected: PASS — 4 tests.
 
 - [ ] **Step 7: Re-run `ChatWindow.test.ts` to confirm the refactor didn't regress the no-attachments path**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/ui exec vitest run src/ChatWindow.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec vitest run src/ChatWindow.test.ts
 ```
 Expected: PASS — still 2 tests.
 
@@ -1738,63 +1738,63 @@ Expected: PASS — still 2 tests.
 - [ ] **Step 1: Run the full test suite for every package**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-tool-render exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/plugin-file-handling exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/ui exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/svelte exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-tool-render exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-file-handling exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run
 ```
-Expected: PASS — `plugin-tool-render` 4 tests, `plugin-markdown` 21 tests (16 parser — 14 original plus 2 from Task 2 Step 9a's infinite-loop fix — + 5 component), `plugin-file-handling` 5 tests, `@chatkit/ui` 11 tests (2 ChatWindow + 5 MessageList + 4 Composer), `@chatkit/svelte` 10 tests (7 chat-store — 6 from M2 plus this plan's attachment-only-send test — + 3 ChatProvider), `@chatkit/core` 33 tests, `@chatkit/transport-agui` 44 tests.
+Expected: PASS — `plugin-tool-render` 4 tests, `plugin-markdown` 21 tests (16 parser — 14 original plus 2 from Task 2 Step 9a's infinite-loop fix — + 5 component), `plugin-file-handling` 5 tests, `@chatkit-svelte/ui` 11 tests (2 ChatWindow + 5 MessageList + 4 Composer), `@chatkit-svelte/svelte` 10 tests (7 chat-store — 6 from M2 plus this plan's attachment-only-send test — + 3 ChatProvider), `@chatkit-svelte/core` 33 tests, `@chatkit-svelte/transport-agui` 44 tests.
 
 - [ ] **Step 2: Typecheck every package touched or created in this plan**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-tool-render exec svelte-check --tsconfig ./tsconfig.json
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown exec svelte-check --tsconfig ./tsconfig.json
-npx pnpm@9.0.0 --filter @chatkit/plugin-file-handling exec svelte-check --tsconfig ./tsconfig.json
-npx pnpm@9.0.0 --filter @chatkit/ui exec svelte-check --tsconfig ./tsconfig.json
-npx pnpm@9.0.0 --filter @chatkit/svelte exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-tool-render exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-file-handling exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui exec svelte-check --tsconfig ./tsconfig.json
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte exec svelte-check --tsconfig ./tsconfig.json
 ```
 Expected: `0 ERRORS 0 WARNINGS` for all five.
 
 - [ ] **Step 3: Build every new/touched package**
 
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/plugin-tool-render build
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown build
-npx pnpm@9.0.0 --filter @chatkit/plugin-file-handling build
-npx pnpm@9.0.0 --filter @chatkit/ui build
-npx pnpm@9.0.0 --filter @chatkit/svelte build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-tool-render build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-file-handling build
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui build
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte build
 ```
-Expected: all succeed. For `@chatkit/ui`, confirm `dist/tokens.css` and `dist/style.css` both still exist after the build (the `closeBundle` copy plugin from M2 should still be firing).
+Expected: all succeed. For `@chatkit-svelte/ui`, confirm `dist/tokens.css` and `dist/style.css` both still exist after the build (the `closeBundle` copy plugin from M2 should still be firing).
 
-- [ ] **Step 4: Fix a critical, pre-existing packaging bug found by the final review — every package needs to externalize its `@chatkit/*` workspace dependencies, not just `svelte`**
+- [ ] **Step 4: Fix a critical, pre-existing packaging bug found by the final review — every package needs to externalize its `@chatkit-svelte/*` workspace dependencies, not just `svelte`**
 
-Every package's `vite.config.ts` already externalizes `svelte`/`svelte/*` in `rollupOptions.external` (so the peer dependency isn't duplicated into every bundle) — but none of them externalized the workspace's own `@chatkit/*` packages they depend on. This has been true since `@chatkit/svelte`/`@chatkit/ui`/`@chatkit/transport-agui` first started depending on `@chatkit/core` (M1/M2), but was invisible until this milestone's final review built the first real cross-package integration check at the `dist/` level (every prior test only exercised one package's own build in isolation).
+Every package's `vite.config.ts` already externalizes `svelte`/`svelte/*` in `rollupOptions.external` (so the peer dependency isn't duplicated into every bundle) — but none of them externalized the workspace's own `@chatkit-svelte/*` packages they depend on. This has been true since `@chatkit-svelte/svelte`/`@chatkit-svelte/ui`/`@chatkit-svelte/transport-agui` first started depending on `@chatkit-svelte/core` (M1/M2), but was invisible until this milestone's final review built the first real cross-package integration check at the `dist/` level (every prior test only exercised one package's own build in isolation).
 
-**The actual bug this caused**: building `@chatkit/ui` without externalizing `@chatkit/svelte` means Vite bundles (inlines) `@chatkit/svelte`'s full source into `packages/ui/dist/index.js` — including `context.ts`'s `const CHATKIT_CONTEXT_KEY = Symbol('chatkit');`. Since `Symbol('chatkit') !== Symbol('chatkit')` (every `Symbol(...)` call is a distinct value, string description notwithstanding), a real consumer importing `<ChatProvider>` from the actual `@chatkit/svelte` package and `<MessageList>`/`getChatContext` from `@chatkit/ui` ends up with two non-matching context-key symbols — one from `@chatkit/svelte`'s own dist, a second baked separately into `@chatkit/ui`'s dist. `getChatContext()` throws `"must be called within a <ChatProvider>"` even when the tree is correctly wrapped. This is a hard crash for every real consumer of this library, using it exactly the way it's meant to be used — confirmed and reproduced directly (reverting the fix reproduces the exact error; re-applying it resolves it) rather than assumed.
+**The actual bug this caused**: building `@chatkit-svelte/ui` without externalizing `@chatkit-svelte/svelte` means Vite bundles (inlines) `@chatkit-svelte/svelte`'s full source into `packages/ui/dist/index.js` — including `context.ts`'s `const CHATKIT_CONTEXT_KEY = Symbol('chatkit');`. Since `Symbol('chatkit') !== Symbol('chatkit')` (every `Symbol(...)` call is a distinct value, string description notwithstanding), a real consumer importing `<ChatProvider>` from the actual `@chatkit-svelte/svelte` package and `<MessageList>`/`getChatContext` from `@chatkit-svelte/ui` ends up with two non-matching context-key symbols — one from `@chatkit-svelte/svelte`'s own dist, a second baked separately into `@chatkit-svelte/ui`'s dist. `getChatContext()` throws `"must be called within a <ChatProvider>"` even when the tree is correctly wrapped. This is a hard crash for every real consumer of this library, using it exactly the way it's meant to be used — confirmed and reproduced directly (reverting the fix reproduces the exact error; re-applying it resolves it) rather than assumed.
 
-Add `@chatkit/core`/`@chatkit/svelte` (whichever a given package actually depends on — check its `package.json`'s `dependencies`, don't assume) to `rollupOptions.external` in six files, alongside the existing `svelte` entries:
+Add `@chatkit-svelte/core`/`@chatkit-svelte/svelte` (whichever a given package actually depends on — check its `package.json`'s `dependencies`, don't assume) to `rollupOptions.external` in six files, alongside the existing `svelte` entries:
 
-- `packages/transport-agui/vite.config.ts` → `external: ['@chatkit/core']` (this package has no `svelte` external entry today since it's UI-free — add `@chatkit/core` standalone).
-- `packages/svelte/vite.config.ts` → `external: ['svelte', /^svelte\//, '@chatkit/core']`.
-- `packages/ui/vite.config.ts` → `external: ['svelte', /^svelte\//, '@chatkit/core', '@chatkit/svelte']` — **this is the package where the bug is user-visible today**; merge into the existing `rollupOptions` object, which also has `output: { assetFileNames: 'style.css' }` from an earlier fix — keep both.
-- `packages/plugin-tool-render/vite.config.ts`, `packages/plugin-markdown/vite.config.ts`, `packages/plugin-file-handling/vite.config.ts` → each `external: ['svelte', /^svelte\//, '@chatkit/core']`. These three currently only import TYPES from `@chatkit/core` (fully erased at compile time), so they aren't runtime-broken today — fixed anyway for consistency and to prevent this exact bug class if any of them later imports a runtime value from `@chatkit/core`.
+- `packages/transport-agui/vite.config.ts` → `external: ['@chatkit-svelte/core']` (this package has no `svelte` external entry today since it's UI-free — add `@chatkit-svelte/core` standalone).
+- `packages/svelte/vite.config.ts` → `external: ['svelte', /^svelte\//, '@chatkit-svelte/core']`.
+- `packages/ui/vite.config.ts` → `external: ['svelte', /^svelte\//, '@chatkit-svelte/core', '@chatkit-svelte/svelte']` — **this is the package where the bug is user-visible today**; merge into the existing `rollupOptions` object, which also has `output: { assetFileNames: 'style.css' }` from an earlier fix — keep both.
+- `packages/plugin-tool-render/vite.config.ts`, `packages/plugin-markdown/vite.config.ts`, `packages/plugin-file-handling/vite.config.ts` → each `external: ['svelte', /^svelte\//, '@chatkit-svelte/core']`. These three currently only import TYPES from `@chatkit-svelte/core` (fully erased at compile time), so they aren't runtime-broken today — fixed anyway for consistency and to prevent this exact bug class if any of them later imports a runtime value from `@chatkit-svelte/core`.
 
 Then rebuild every package in dependency order (each depends on the previous one's `dist/` being current):
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core build
-npx pnpm@9.0.0 --filter @chatkit/transport-agui build
-npx pnpm@9.0.0 --filter @chatkit/svelte build
-npx pnpm@9.0.0 --filter @chatkit/ui build
-npx pnpm@9.0.0 --filter @chatkit/plugin-tool-render build
-npx pnpm@9.0.0 --filter @chatkit/plugin-markdown build
-npx pnpm@9.0.0 --filter @chatkit/plugin-file-handling build
+npx pnpm@9.0.0 --filter @chatkit-svelte/core build
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui build
+npx pnpm@9.0.0 --filter @chatkit-svelte/svelte build
+npx pnpm@9.0.0 --filter @chatkit-svelte/ui build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-tool-render build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-markdown build
+npx pnpm@9.0.0 --filter @chatkit-svelte/plugin-file-handling build
 ```
 
-Verify the fix actually resolves the bug, not just that the config "looks right": confirm `packages/ui/dist/index.js` no longer contains an inlined `Symbol("chatkit")` — it should instead have a real `import { getChatContext } from "@chatkit/svelte"` (or equivalent) statement. Then build a real dist-level integration check: a throwaway workspace package with `@chatkit/svelte`/`@chatkit/ui` as genuine dependencies (resolved via pnpm symlinks to each package's `dist/`, not source), rendering `<ChatProvider>` (from `@chatkit/svelte`) around `<ChatWindow>` (from `@chatkit/ui`) and confirming it renders with no context error. To prove this check is meaningful and not a false positive, temporarily revert the `external` fix, rebuild, and confirm the check now fails with exactly `[chatkit] getChatContext() must be called within a <ChatProvider>` — then restore the fix, rebuild, and confirm it passes again. Delete the throwaway package completely afterward and run `npx pnpm@9.0.0 install` to restore a clean lockfile — leave no trace of it in the repo.
+Verify the fix actually resolves the bug, not just that the config "looks right": confirm `packages/ui/dist/index.js` no longer contains an inlined `Symbol("chatkit")` — it should instead have a real `import { getChatContext } from "@chatkit-svelte/svelte"` (or equivalent) statement. Then build a real dist-level integration check: a throwaway workspace package with `@chatkit-svelte/svelte`/`@chatkit-svelte/ui` as genuine dependencies (resolved via pnpm symlinks to each package's `dist/`, not source), rendering `<ChatProvider>` (from `@chatkit-svelte/svelte`) around `<ChatWindow>` (from `@chatkit-svelte/ui`) and confirming it renders with no context error. To prove this check is meaningful and not a false positive, temporarily revert the `external` fix, rebuild, and confirm the check now fails with exactly `[chatkit] getChatContext() must be called within a <ChatProvider>` — then restore the fix, rebuild, and confirm it passes again. Delete the throwaway package completely afterward and run `npx pnpm@9.0.0 install` to restore a clean lockfile — leave no trace of it in the repo.
 
 Finally, re-run the full regression suite for all 7 packages (same test counts as Step 1) and `svelte-check` for the 5 Svelte packages (still `0 ERRORS 0 WARNINGS`) to confirm this packaging-only fix didn't change any source-level behavior.
 
@@ -1817,7 +1817,7 @@ No git commit — per repo owner preference, commits are handled manually. This 
 
 ## Notes for the next plan (M4)
 
-- M4 adds `STATE_SNAPSHOT`/`STATE_DELTA` UI surfacing and the HITL approval flow (`<ApprovalBar>`, `approveToolCall`/`rejectToolCall`/`editAndRetry`) — `chat-store.svelte.ts` already exposes `runStatus` including `'awaiting_approval'` (from M0's reducer) but nothing in `@chatkit/svelte`/`@chatkit/ui` reads it yet; `createChatStore`'s M2-scoped omission of `pendingApprovals`/`approveToolCall`/etc. is exactly what M4 fills in.
+- M4 adds `STATE_SNAPSHOT`/`STATE_DELTA` UI surfacing and the HITL approval flow (`<ApprovalBar>`, `approveToolCall`/`rejectToolCall`/`editAndRetry`) — `chat-store.svelte.ts` already exposes `runStatus` including `'awaiting_approval'` (from M0's reducer) but nothing in `@chatkit-svelte/svelte`/`@chatkit-svelte/ui` reads it yet; `createChatStore`'s M2-scoped omission of `pendingApprovals`/`approveToolCall`/etc. is exactly what M4 fills in.
 - Drag-drop and paste-as-file input transforms (deferred from this plan's Task 3) plug into the same `attachmentHandlers` pipeline `<Composer>` now consults generically (Task 5) — no `<Composer>` changes should be needed, just a new `inputTransforms`-consulting entry point (or, more simply, drag/paste event listeners on the composer form that call the same `handleFileChange`-shaped logic already written).
 - Syntax highlighting for `plugin-markdown`'s code blocks (deferred from Task 2) can be added without changing the plugin's registration shape — `Markdown.svelte`'s `<pre><code data-lang={block.lang}>` already carries the language, a highlighter just needs to tokenize `block.text` into more granular AST-like spans before rendering, which fits the existing "parse to AST, render via elements, no `{@html}`" architecture without restructuring it.
-- **Workspace build-staleness gotcha, discovered during Task 5**: `@chatkit/ui` (and any other package) consumes `@chatkit/svelte` via its BUILT `dist/index.js` — `packages/svelte/package.json`'s `exports` map has no source/dev condition, and pnpm's workspace symlink resolves through that same map. This means a source-only edit to anything in `packages/svelte/src` is invisible to `@chatkit/ui`'s tests until `@chatkit/svelte` is rebuilt (`npx pnpm@9.0.0 --filter @chatkit/svelte build`) — with no error signal if you forget; tests just silently exercise stale compiled behavior. This bit Task 5 directly (a `chat-store.svelte.ts` fix needed a manual rebuild before `Composer.test.ts` would see it) and will bite again any time a future milestone edits `@chatkit/core`/`@chatkit/svelte` and then immediately tests a dependent package in the same task. **Any M4+ task that modifies a file in one package and tests another package that depends on it must explicitly rebuild the modified package first** (or add this as an explicit plan step, the way M0/M1's final-verification tasks already do at the END of a milestone — the gap is specifically mid-milestone, cross-task edits). Consider, as a real fix rather than a per-task reminder: a `pretest` script in `@chatkit/ui`/`@chatkit/plugin-*` packages that rebuilds their `workspace:*` dependencies first, or Vite aliases pointing `@chatkit/core`/`@chatkit/svelte` at `src/` during local dev/test.
+- **Workspace build-staleness gotcha, discovered during Task 5**: `@chatkit-svelte/ui` (and any other package) consumes `@chatkit-svelte/svelte` via its BUILT `dist/index.js` — `packages/svelte/package.json`'s `exports` map has no source/dev condition, and pnpm's workspace symlink resolves through that same map. This means a source-only edit to anything in `packages/svelte/src` is invisible to `@chatkit-svelte/ui`'s tests until `@chatkit-svelte/svelte` is rebuilt (`npx pnpm@9.0.0 --filter @chatkit-svelte/svelte build`) — with no error signal if you forget; tests just silently exercise stale compiled behavior. This bit Task 5 directly (a `chat-store.svelte.ts` fix needed a manual rebuild before `Composer.test.ts` would see it) and will bite again any time a future milestone edits `@chatkit-svelte/core`/`@chatkit-svelte/svelte` and then immediately tests a dependent package in the same task. **Any M4+ task that modifies a file in one package and tests another package that depends on it must explicitly rebuild the modified package first** (or add this as an explicit plan step, the way M0/M1's final-verification tasks already do at the END of a milestone — the gap is specifically mid-milestone, cross-task edits). Consider, as a real fix rather than a per-task reminder: a `pretest` script in `@chatkit-svelte/ui`/`@chatkit-svelte/plugin-*` packages that rebuilds their `workspace:*` dependencies first, or Vite aliases pointing `@chatkit-svelte/core`/`@chatkit-svelte/svelte` at `src/` during local dev/test.

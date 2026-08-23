@@ -2,7 +2,7 @@ export const vercelEchoServerSource = `import { createServer } from 'node:http';
 
 // Minimal Vercel AI SDK "data stream protocol" echo server for local
 // development: POST the message history, get back a streamed reply in the
-// same type-prefixed-line format @chatkit/transport-vercel-ai parses
+// same type-prefixed-line format @chatkit-svelte/transport-vercel-ai parses
 // (see that package's README/plan for the format reference). Not a real
 // agent backend — replace this once you have one.
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8787;

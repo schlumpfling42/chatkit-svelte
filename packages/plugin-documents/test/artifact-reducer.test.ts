@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { documentArtifactReducer } from '../src/artifact-reducer';
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 describe('documentArtifactReducer', () => {
   it('matches chatkit.document.snapshot and chatkit.document.delta CUSTOM events only', () => {

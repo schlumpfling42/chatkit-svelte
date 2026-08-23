@@ -1,4 +1,4 @@
-import type { ArtifactRecord } from '@chatkit/core';
+import type { ArtifactRecord } from '@chatkit-svelte/core';
 import type { DocumentArtifactData, ExportFormat, ExportHandlers } from './types';
 
 export async function exportDocument(

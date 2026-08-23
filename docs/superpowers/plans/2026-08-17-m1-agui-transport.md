@@ -4,7 +4,7 @@
 >
 > **Git note:** commit steps are intentionally omitted — the repo owner handles git operations manually. Do not run `git add`/`git commit` while executing this plan unless explicitly asked to in the moment.
 
-**Goal:** Build `@chatkit/transport-agui` — a real `ChatTransport` implementation (per spec §3.2, already defined in `@chatkit/core`) that talks to an AG-UI-style backend over SSE by default or WebSocket opt-in, with reconnect/exponential-backoff, resumeToken-based reconnection, a bounded/coalescing event queue for delta bursts, an `Idempotency-Key` header on every run, and self-healing `STATE_DELTA` conflict recovery.
+**Goal:** Build `@chatkit-svelte/transport-agui` — a real `ChatTransport` implementation (per spec §3.2, already defined in `@chatkit-svelte/core`) that talks to an AG-UI-style backend over SSE by default or WebSocket opt-in, with reconnect/exponential-backoff, resumeToken-based reconnection, a bounded/coalescing event queue for delta bursts, an `Idempotency-Key` header on every run, and self-healing `STATE_DELTA` conflict recovery.
 
 **Architecture:** Six small, independently-testable modules compose into one factory function, `createAguiTransport(options) => ChatTransport`:
 - `sse-parser.ts` — incremental, streaming-safe Server-Sent-Events frame parser (pure, no I/O).
@@ -57,11 +57,11 @@ packages/transport-agui/
 
 - [ ] **Step 1: Add missing devDependencies to `packages/transport-agui/package.json`**
 
-The file already exists (from initial monorepo scaffolding) with `@chatkit/core` as a dependency and `typescript`/`vite`/`vitest` as devDependencies. Update the `devDependencies` block to also include `vite-plugin-dts` (for declaration bundling, matching `@chatkit/core`'s setup), `@types/node` (this package's tests spin up real `node:http` servers), and `ws`/`@types/ws` (the WebSocket-mode tests spin up a real `ws` server — `ws` is a devDependency only, never imported by `src/agui-transport.ts` itself, which uses the platform-global `WebSocket`):
+The file already exists (from initial monorepo scaffolding) with `@chatkit-svelte/core` as a dependency and `typescript`/`vite`/`vitest` as devDependencies. Update the `devDependencies` block to also include `vite-plugin-dts` (for declaration bundling, matching `@chatkit-svelte/core`'s setup), `@types/node` (this package's tests spin up real `node:http` servers), and `ws`/`@types/ws` (the WebSocket-mode tests spin up a real `ws` server — `ws` is a devDependency only, never imported by `src/agui-transport.ts` itself, which uses the platform-global `WebSocket`):
 
 ```json
 {
-  "name": "@chatkit/transport-agui",
+  "name": "@chatkit-svelte/transport-agui",
   "version": "0.0.0",
   "description": "AG-UI protocol client (SSE + WebSocket + HTTP fallback, reconnect/backoff). See README for the AG-UI event-set version this targets.",
   "type": "module",
@@ -79,7 +79,7 @@ The file already exists (from initial monorepo scaffolding) with `@chatkit/core`
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -219,7 +219,7 @@ describe('createSseFrameParser', () => {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/sse-parser.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/sse-parser.test.ts
 ```
 Expected: FAIL — `Cannot find module './sse-parser'`.
 
@@ -314,7 +314,7 @@ export function createSseFrameParser(): SseFrameParser {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/sse-parser.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/sse-parser.test.ts
 ```
 Expected: PASS — 9 tests.
 
@@ -386,7 +386,7 @@ describe('computeBackoffDelay', () => {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/backoff.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/backoff.test.ts
 ```
 Expected: FAIL — `Cannot find module './backoff'`.
 
@@ -430,7 +430,7 @@ export function computeBackoffDelay(attempt: number, options: BackoffOptions = {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/backoff.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/backoff.test.ts
 ```
 Expected: PASS — 7 tests.
 
@@ -449,7 +449,7 @@ A FIFO queue of `ChatEvent`s with a soft capacity (spec §3.3, default 500): onc
 ```ts
 import { describe, expect, it } from 'vitest';
 import { BoundedEventQueue } from './event-queue';
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 describe('BoundedEventQueue', () => {
   it('enqueues events in order under capacity', () => {
@@ -526,14 +526,14 @@ describe('BoundedEventQueue', () => {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/event-queue.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/event-queue.test.ts
 ```
 Expected: FAIL — `Cannot find module './event-queue'`.
 
 - [ ] **Step 3: Write `packages/transport-agui/src/event-queue.ts`**
 
 ```ts
-import type { ChatEvent } from '@chatkit/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 function coalesceKey(event: ChatEvent): string | undefined {
   switch (event.type) {
@@ -609,7 +609,7 @@ export class BoundedEventQueue {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/event-queue.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/event-queue.test.ts
 ```
 Expected: PASS — 8 tests.
 
@@ -684,7 +684,7 @@ describe('createPushPullBridge', () => {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/push-pull-bridge.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/push-pull-bridge.test.ts
 ```
 Expected: FAIL — `Cannot find module './push-pull-bridge'`.
 
@@ -753,7 +753,7 @@ export function createPushPullBridge<T>(): PushPullBridge<T> {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/push-pull-bridge.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/push-pull-bridge.test.ts
 ```
 Expected: PASS — 5 tests.
 
@@ -1008,15 +1008,15 @@ describe('createAguiTransport — getCapabilities', () => {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/agui-transport.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/agui-transport.test.ts
 ```
 Expected: FAIL — `Cannot find module './agui-transport'`.
 
 - [ ] **Step 3: Write `packages/transport-agui/src/agui-transport.ts` (SSE mode + control-plane calls)**
 
 ```ts
-import { applyPatch } from '@chatkit/core';
-import type { AgentCapabilities, ChatEvent, ChatTransport, RunAgentInput, ToolResult } from '@chatkit/core';
+import { applyPatch } from '@chatkit-svelte/core';
+import type { AgentCapabilities, ChatEvent, ChatTransport, RunAgentInput, ToolResult } from '@chatkit-svelte/core';
 import { createSseFrameParser } from './sse-parser';
 import { computeBackoffDelay, type BackoffOptions } from './backoff';
 import { BoundedEventQueue } from './event-queue';
@@ -1180,7 +1180,7 @@ export function createAguiTransport(options: AguiTransportOptions): ChatTranspor
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/agui-transport.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/agui-transport.test.ts
 ```
 Expected: PASS — 9 tests.
 
@@ -1267,7 +1267,7 @@ Two follow-up tests were added after the initial 9, closing real gaps a code-qua
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/agui-transport.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/agui-transport.test.ts
 ```
 Expected: PASS — 11 tests. Run it 2-3 times in a row to check for flakiness (real timers, real sockets — if the `1.4` multiplier is ever borderline flaky in this environment, loosening it to `1.3` is acceptable, but don't drop the assertion's intent).
 
@@ -1399,7 +1399,7 @@ describe('createAguiTransport — websocket mode', () => {
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/agui-transport-websocket.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/agui-transport-websocket.test.ts
 ```
 Expected: FAIL — `createAguiTransport` doesn't accept a `mode`/`WebSocketImpl` option yet, and `connect()` never opens a WebSocket, so nothing is ever yielded and the test times out waiting on `iterator.next()`. (If you hit this timeout while implementing Step 3, don't just wait it out — that's expected until the WebSocket path exists.)
 
@@ -1408,8 +1408,8 @@ Expected: FAIL — `createAguiTransport` doesn't accept a `mode`/`WebSocketImpl`
 Full file content after this step (replace the entire file with this):
 
 ```ts
-import { applyPatch } from '@chatkit/core';
-import type { AgentCapabilities, ChatEvent, ChatTransport, RunAgentInput, ToolResult } from '@chatkit/core';
+import { applyPatch } from '@chatkit-svelte/core';
+import type { AgentCapabilities, ChatEvent, ChatTransport, RunAgentInput, ToolResult } from '@chatkit-svelte/core';
 import { createSseFrameParser } from './sse-parser';
 import { computeBackoffDelay, type BackoffOptions } from './backoff';
 import { BoundedEventQueue } from './event-queue';
@@ -1684,7 +1684,7 @@ export function createAguiTransport(options: AguiTransportOptions): ChatTranspor
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/agui-transport-websocket.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/agui-transport-websocket.test.ts
 ```
 Expected: PASS — 3 tests.
 
@@ -1692,7 +1692,7 @@ Expected: PASS — 3 tests.
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/agui-transport.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/agui-transport.test.ts
 ```
 Expected: PASS — still 11 tests (Task 6 ends with 11, not 9 — see Task 6 Step 5).
 
@@ -1759,14 +1759,14 @@ Add this test to `packages/transport-agui/src/agui-transport-websocket.test.ts`,
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run src/agui-transport-websocket.test.ts
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run src/agui-transport-websocket.test.ts
 ```
 Expected: PASS — 4 tests. (If you want to confirm this test actually catches the bug it's guarding against, temporarily reverting the `close` listener to the one-liner from Step 3's "before" version should make this test fail with both gaps near-equal at a few ms; re-apply the fix afterward.)
 
 Then re-run the full package suite:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec tsc --noEmit
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec tsc --noEmit
 ```
 Expected: PASS — 6 test files, 44 tests, zero type errors.
 
@@ -1795,7 +1795,7 @@ export type { PushPullBridge } from './push-pull-bridge';
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec vitest run
 ```
 Expected: PASS — 6 test files, 44 tests (9 sse-parser + 7 backoff + 8 event-queue + 5 push-pull-bridge + 11 agui-transport (SSE — 9 original plus the two coverage-gap tests added in Task 6 Step 5) + 4 agui-transport-websocket — 3 original plus the backoff-escalation regression test added in Task 7 Step 6).
 
@@ -1803,7 +1803,7 @@ Expected: PASS — 6 test files, 44 tests (9 sse-parser + 7 backoff + 8 event-qu
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui exec tsc --noEmit
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui exec tsc --noEmit
 ```
 Expected: no errors.
 
@@ -1811,16 +1811,16 @@ Expected: no errors.
 
 Run:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/transport-agui build
+npx pnpm@9.0.0 --filter @chatkit-svelte/transport-agui build
 ```
 Expected: succeeds, producing `packages/transport-agui/dist/index.js` and `packages/transport-agui/dist/index.d.ts`.
 
-- [ ] **Step 5: Confirm `@chatkit/core` still builds and tests clean too**
+- [ ] **Step 5: Confirm `@chatkit-svelte/core` still builds and tests clean too**
 
-This package imports types and `applyPatch` from `@chatkit/core`; confirm the dependency direction hasn't introduced any issue on the core side:
+This package imports types and `applyPatch` from `@chatkit-svelte/core`; confirm the dependency direction hasn't introduced any issue on the core side:
 ```bash
-npx pnpm@9.0.0 --filter @chatkit/core exec vitest run
-npx pnpm@9.0.0 --filter @chatkit/core exec tsc --noEmit
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec vitest run
+npx pnpm@9.0.0 --filter @chatkit-svelte/core exec tsc --noEmit
 ```
 Expected: PASS — 33 tests, no errors (unchanged from M0).
 
@@ -1843,6 +1843,6 @@ No git commit — per repo owner preference, commits are handled manually. This 
 
 ## Notes for the next plan (M2)
 
-- M2 builds `@chatkit/svelte`'s `createChatStore` (spec §7), which is the first consumer of `createAguiTransport` alongside `@chatkit/core`'s `reduceEvent`/`createPluginHost`. It should also exercise `createFixtureTransport` from M0 for tests that don't need a real server.
+- M2 builds `@chatkit-svelte/svelte`'s `createChatStore` (spec §7), which is the first consumer of `createAguiTransport` alongside `@chatkit-svelte/core`'s `reduceEvent`/`createPluginHost`. It should also exercise `createFixtureTransport` from M0 for tests that don't need a real server.
 - The "AG-UI protocol version compatibility" note from spec §20 ("tracked explicitly in `transport-agui`'s README") hasn't been written yet — worth adding a short README to `packages/transport-agui` documenting the wire conventions this plan established (paths, Idempotency-Key, resumeToken semantics, WebSocket's current no-resumeToken scope boundary) once M2 or M7 (Vercel AI SDK adapter) puts pressure on formalizing it.
 - WebSocket mode's lack of resumeToken support (Task 7's scope note) is the most likely thing a real backend integration will need extended — if that need materializes, it likely wants a small envelope convention (`{ id, event }` per WS message) mirroring SSE's `id:` field, plumbed through the same `push-pull-bridge`.

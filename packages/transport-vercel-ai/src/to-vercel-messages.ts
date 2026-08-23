@@ -1,4 +1,4 @@
-import type { Message } from '@chatkit/core';
+import type { Message } from '@chatkit-svelte/core';
 
 export interface VercelMessage {
   role: string;

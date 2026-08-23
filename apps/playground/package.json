@@ -12,15 +12,15 @@
     "test": "playwright test"
   },
   "dependencies": {
-    "@chatkit/core": "workspace:*",
-    "@chatkit/svelte": "workspace:*",
-    "@chatkit/ui": "workspace:*",
-    "@chatkit/plugin-file-handling": "workspace:*",
-    "@chatkit/plugin-markdown": "workspace:*",
-    "@chatkit/plugin-tool-render": "workspace:*",
-    "@chatkit/plugin-forms": "workspace:*",
-    "@chatkit/plugin-documents": "workspace:*",
-    "@chatkit/plugin-devtools": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*",
+    "@chatkit-svelte/svelte": "workspace:*",
+    "@chatkit-svelte/ui": "workspace:*",
+    "@chatkit-svelte/plugin-file-handling": "workspace:*",
+    "@chatkit-svelte/plugin-markdown": "workspace:*",
+    "@chatkit-svelte/plugin-tool-render": "workspace:*",
+    "@chatkit-svelte/plugin-forms": "workspace:*",
+    "@chatkit-svelte/plugin-documents": "workspace:*",
+    "@chatkit-svelte/plugin-devtools": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.45.0",

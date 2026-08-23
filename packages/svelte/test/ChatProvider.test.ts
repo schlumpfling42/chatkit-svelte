@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import ChatProviderHarness from './ChatProviderHarness.svelte';
 import OrphanProbe from './OrphanProbe.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ChatEvent } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ChatEvent } from '@chatkit-svelte/core';
 
 describe('ChatProvider', () => {
   it('makes the chat store available to descendants via context', async () => {

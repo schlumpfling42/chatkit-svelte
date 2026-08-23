@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import TestHarness from './TestHarness.svelte';
 import ArtifactPanelHarness from './ArtifactPanelHarness.svelte';
-import { createFixtureTransport } from '@chatkit/core';
-import type { ArtifactRecord, ChatEvent, ChatPlugin } from '@chatkit/core';
+import { createFixtureTransport } from '@chatkit-svelte/core';
+import type { ArtifactRecord, ChatEvent, ChatPlugin } from '@chatkit-svelte/core';
 import CustomArtifactCard from './CustomArtifactCard.test-helper.svelte';
 
 function snapshotEvent(artifactId: string, value: string): ChatEvent {

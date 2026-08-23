@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toVercelMessages } from './to-vercel-messages';
-import type { Message } from '@chatkit/core';
+import type { Message } from '@chatkit-svelte/core';
 
 describe('toVercelMessages', () => {
   it('concatenates text parts into a single content string per message', () => {

@@ -1,4 +1,4 @@
-import type { AgentCapabilities, ChatEvent, ChatTransport, RunAgentInput, ToolResult } from '@chatkit/core';
+import type { AgentCapabilities, ChatEvent, ChatTransport, RunAgentInput, ToolResult } from '@chatkit-svelte/core';
 import { createDataStreamParser, type DataStreamPart } from './data-stream-parser';
 import { createBridge } from './bridge';
 import { toVercelMessages } from './to-vercel-messages';
