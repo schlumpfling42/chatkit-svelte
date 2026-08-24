@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["pnpm@9.0.0", "-C", "C:\\Data\\Projects\\chat-ui-boot\\apps\\playground", "exec", "vite", "dev"],
       "port": 5180
+    },
+    {
+      "name": "managed-agent-demo",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["pnpm@9.0.0", "-C", "C:\\Data\\Projects\\chat-ui-boot\\apps\\managed-agent-demo", "exec", "vite", "dev"],
+      "port": 5181
     }
   ]
 }
