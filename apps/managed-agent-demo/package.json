@@ -1,0 +1,33 @@
+{
+  "name": "managed-agent-demo",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
+  "description": "Live demo: @chatkit-svelte/transport-agui driving a hosted Claude Managed Agent.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "start": "node build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chatkit-svelte/core": "workspace:*",
+    "@chatkit-svelte/svelte": "workspace:*",
+    "@chatkit-svelte/ui": "workspace:*",
+    "@chatkit-svelte/transport-agui": "workspace:*",
+    "@chatkit-svelte/plugin-tool-render": "workspace:*",
+    "@ag-ui/claude-managed-agents": "^0.0.1",
+    "@anthropic-ai/sdk": "^0.109.0"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-node": "^5.0.0",
+    "@sveltejs/kit": "^2.5.0",
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "svelte": "^5.0.0",
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}
