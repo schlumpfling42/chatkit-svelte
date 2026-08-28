@@ -1,4 +1,5 @@
 import { ManagedAgentsAgent } from '@ag-ui/claude-managed-agents';
+import type { SessionRecord, SessionStore } from '@ag-ui/claude-managed-agents';
 import Anthropic, { toFile } from '@anthropic-ai/sdk';
 import { randomUUID } from 'node:crypto';
 import { applyPatch } from '@chatkit-svelte/core';
@@ -10,27 +11,58 @@ interface Subscription {
   unsubscribe: () => void;
 }
 
+/**
+ * `@ag-ui/claude-managed-agents` looks up/stores its thread↔session mapping
+ * under an opaque, undocumented-format key -- by design (see its own
+ * `SessionStore` doc comment: "treat it as a string to store under, not as
+ * a thread id to parse"). Since agent-sessions.ts already constructs one
+ * `ManagedAgentsAgent` per thread (see getOrCreateSession below), each
+ * instance's store only ever needs to hold that one thread's single record,
+ * so it never needs to understand the key at all -- just remember whatever
+ * was last set, and let a pre-seeded record short-circuit the adapter's own
+ * session creation. That's what makes the single-turn attachment flow in
+ * startRun() below possible: pre-create the real session with files already
+ * attached as resources, seed this store with it, then let the adapter's
+ * next getOrCreateSession() call find it already there.
+ */
+class SingleRecordSessionStore implements SessionStore {
+  private record: SessionRecord | undefined;
+  get(): SessionRecord | undefined {
+    return this.record;
+  }
+  set(_key: string, record: SessionRecord): void {
+    this.record = record;
+  }
+  delete(): void {
+    this.record = undefined;
+  }
+  seed(record: SessionRecord): void {
+    this.record = record;
+  }
+}
+
 interface ThreadSession {
   agent: ManagedAgentsAgent;
+  sessionStore: SingleRecordSessionStore;
   events: ChatEvent[];
   currentState: unknown;
   activeRunId: string | null;
   activeSubscription: Subscription | null;
   waiters: Array<() => void>;
   /**
-   * The real Anthropic session id, learned from the `managed_agents.session`
-   * CUSTOM event `@ag-ui/claude-managed-agents` emits once it creates the
-   * underlying session. Needed to mount file resources mid-conversation via
-   * sessions.resources.add() -- the adapter has no concept of this itself.
+   * The real Anthropic session id. Either learned from the
+   * `managed_agents.session` CUSTOM event the adapter emits once it creates
+   * a session itself, or set directly by startRun() when it pre-creates one
+   * for a first message that carries an attachment.
    */
   realSessionId: string | null;
 }
 
 const sessions = new Map<string, ThreadSession>();
 
-// Shared with the ManagedAgentsAgent instances below, so uploads/resource
-// mounts done directly (bypassing the adapter) hit the same account/session
-// space it uses internally.
+// Shared with the ManagedAgentsAgent instances below, so uploads/session
+// creation/resource mounts done directly (bypassing the adapter for what it
+// doesn't expose) hit the same account/session space it uses internally.
 const anthropicClient = new Anthropic();
 
 function notifyWaiters(session: ThreadSession): void {
@@ -57,6 +89,19 @@ function appendEvent(session: ThreadSession, event: ChatEvent): void {
   notifyWaiters(session);
 }
 
+function appendRunError(session: ThreadSession, runId: string, code: string, err: unknown, recoverable = false): void {
+  appendEvent(session, {
+    type: 'RUN_ERROR',
+    runId,
+    error: {
+      code,
+      message: err instanceof Error ? err.message : String(err),
+      recoverable,
+      raw: err,
+    },
+  });
+}
+
 /**
  * Clears the active-run bookkeeping only if it still belongs to `runId`.
  * A run's `error`/`complete` callback can fire after a newer run has
@@ -74,8 +119,10 @@ export function getOrCreateSession(threadId: string): ThreadSession {
   let session = sessions.get(threadId);
   if (!session) {
     const env = getManagedAgentEnv();
+    const sessionStore = new SingleRecordSessionStore();
     session = {
-      agent: new ManagedAgentsAgent({ managedAgentId: env.agentId, environmentId: env.environmentId, client: anthropicClient }),
+      agent: new ManagedAgentsAgent({ managedAgentId: env.agentId, environmentId: env.environmentId, client: anthropicClient, sessionStore }),
+      sessionStore,
       events: [],
       currentState: undefined,
       activeRunId: null,
@@ -90,11 +137,9 @@ export function getOrCreateSession(threadId: string): ThreadSession {
 
 /**
  * Runs one real turn against the agent and reports its events. Pure
- * turn-taking only -- no attachment handling. `startRun` (below) is what
- * detects attachments and may call this twice: once for a text-only turn,
- * then again as a follow-up once files are mounted as session resources.
- * Resolves once the turn finishes (error or complete), so a caller can
- * await one turn before starting the next.
+ * turn-taking only -- attachment handling (uploading, mounting, and
+ * rewriting the outgoing message) happens in startRun below, before this is
+ * ever called. Resolves once the turn finishes (error or complete).
  */
 function runTurn(session: ThreadSession, input: RunAgentInput): Promise<void> {
   return new Promise((resolveTurn) => {
@@ -126,24 +171,15 @@ function runTurn(session: ThreadSession, input: RunAgentInput): Promise<void> {
         next: (event) => {
           const raw = event as { type: string; name?: string; value?: { sessionId?: string } };
           // Learn the real Anthropic session id as soon as the adapter
-          // creates one, so a later attachment on this thread can be
-          // mounted via sessions.resources.add() -- see mountAttachment().
+          // creates one itself (the no-attachment path never pre-creates
+          // one, so this is still how that path learns it).
           if (raw.type === 'CUSTOM' && raw.name === 'managed_agents.session' && raw.value?.sessionId) {
             session.realSessionId = raw.value.sessionId;
           }
           appendEvent(session, fromAguiEvent(raw, input.runId));
         },
         error: (err: unknown) => {
-          appendEvent(session, {
-            type: 'RUN_ERROR',
-            runId: input.runId,
-            error: {
-              code: 'managed_agent_error',
-              message: err instanceof Error ? err.message : String(err),
-              recoverable: false,
-              raw: err,
-            },
-          });
+          appendRunError(session, input.runId, 'managed_agent_error', err);
           clearActiveRunIfCurrent(session, input.runId);
           resolveTurn();
         },
@@ -157,16 +193,7 @@ function runTurn(session: ThreadSession, input: RunAgentInput): Promise<void> {
       // subscribe to) — there is no subscription to hold, so don't leave the
       // session stuck thinking a run is still active.
       clearActiveRunIfCurrent(session, input.runId);
-      appendEvent(session, {
-        type: 'RUN_ERROR',
-        runId: input.runId,
-        error: {
-          code: 'managed_agent_error',
-          message: err instanceof Error ? err.message : String(err),
-          recoverable: false,
-          raw: err,
-        },
-      });
+      appendRunError(session, input.runId, 'managed_agent_error', err);
       resolveTurn();
     }
   });
@@ -190,36 +217,66 @@ function extractAttachments(parts: ContentPart[]): Attachment[] {
 
 const DATA_URI = /^data:([^;,]+)(?:;charset=[^;,]+)?;base64,(.+)$/s;
 
-/**
- * Uploads one attachment via the Files API and mounts it into the real,
- * already-running Anthropic session as a resource. `@ag-ui/claude-managed-agents`
- * has no concept of this at all (it only wraps message turns), so this goes
- * directly through the same Anthropic client the adapter itself uses.
- * Requires `session.realSessionId` to already be known -- i.e. at least one
- * turn must have already created the real session (see runTurn's capture of
- * the `managed_agents.session` CUSTOM event).
- */
-async function mountAttachment(session: ThreadSession, attachment: Attachment): Promise<string> {
-  if (!session.realSessionId) {
-    throw new Error('No managed session exists yet to attach files to.');
-  }
+function attachmentFilename(attachment: Attachment): string {
+  const extension = attachment.mimeType.includes('/') ? `.${attachment.mimeType.split('/')[1]}` : '';
+  return attachment.name ?? `${attachment.kind}${extension}`;
+}
+
+/** Uploads one attachment's bytes via the Files API. Throws if `url` isn't a
+ * data: URI -- only files this app's own upload() produced can be handled,
+ * since there's no other source of raw bytes to upload here. */
+async function uploadAttachment(attachment: Attachment): Promise<string> {
   const match = DATA_URI.exec(attachment.url);
   if (!match) {
-    throw new Error(
-      `Attachment "${attachment.name ?? attachment.kind}" is not a data: URI -- only files this app's own upload() produced can be mounted.`
-    );
+    throw new Error(`Attachment "${attachment.name ?? attachment.kind}" is not a data: URI -- only files this app's own upload() produced can be mounted.`);
   }
   const [, mimeType, base64] = match;
   const buffer = Buffer.from(base64, 'base64');
-  const extension = mimeType.includes('/') ? `.${mimeType.split('/')[1]}` : '';
-  const filename = attachment.name ?? `${attachment.kind}${extension}`;
-  const file = await toFile(buffer, filename, { type: mimeType });
+  const file = await toFile(buffer, attachmentFilename(attachment), { type: mimeType });
   const uploaded = await anthropicClient.beta.files.upload({ file });
-  const resource = await anthropicClient.beta.sessions.resources.add(session.realSessionId, {
-    file_id: uploaded.id,
-    type: 'file',
-  });
+  return uploaded.id;
+}
+
+/**
+ * Uploads and mounts one attachment into a session that already exists,
+ * via sessions.resources.add() -- @ag-ui/claude-managed-agents doesn't
+ * expose this at all, so it's done directly against the same Anthropic
+ * client the adapter itself uses. Requires `session.realSessionId`.
+ */
+async function mountOnExistingSession(session: ThreadSession, attachment: Attachment): Promise<string> {
+  if (!session.realSessionId) {
+    throw new Error('No managed session exists yet to attach files to.');
+  }
+  const fileId = await uploadAttachment(attachment);
+  const resource = await anthropicClient.beta.sessions.resources.add(session.realSessionId, { file_id: fileId, type: 'file' });
   return resource.mount_path;
+}
+
+/**
+ * Uploads every attachment and pre-creates the real Anthropic session with
+ * them already attached as resources, seeding the thread's SessionStore so
+ * the adapter's next run() call finds this session instead of making its
+ * own. This is what lets a first message with an attachment reach the agent
+ * in a single turn, with the file already mounted, instead of the
+ * text-only-turn-then-follow-up dance a lazily-created session would need.
+ */
+async function createSessionWithAttachments(session: ThreadSession, attachments: Attachment[]): Promise<Map<Attachment, string>> {
+  const env = getManagedAgentEnv();
+  const fileIds = await Promise.all(attachments.map(uploadAttachment));
+  const created = await anthropicClient.beta.sessions.create({
+    agent: env.agentId,
+    environment_id: env.environmentId,
+    resources: fileIds.map((file_id) => ({ type: 'file' as const, file_id })),
+  });
+  session.realSessionId = created.id;
+  session.sessionStore.seed({ sessionId: created.id, toolNames: [], pendingClientToolUseIds: [] });
+
+  const mountPaths = new Map<Attachment, string>();
+  for (let i = 0; i < attachments.length; i += 1) {
+    const resource = created.resources.find((r) => r.type === 'file' && r.file_id === fileIds[i]);
+    if (resource && resource.type === 'file') mountPaths.set(attachments[i], resource.mount_path);
+  }
+  return mountPaths;
 }
 
 export function startRun(threadId: string, input: RunAgentInput): void {
@@ -232,60 +289,43 @@ export function startRun(threadId: string, input: RunAgentInput): void {
     return;
   }
 
-  // A newly-attached file can't be mounted until the real Anthropic session
-  // exists, and creating that session is itself part of sending a turn — so
-  // the first turn goes out text-only (attachments stripped from the last
-  // message; a placeholder if that leaves no text at all, since the adapter
-  // rejects a turn with nothing sendable). Once it completes (and
-  // session.realSessionId is known), each attachment is uploaded and mounted
-  // as a session resource, then a short follow-up turn tells the agent where
-  // to find them.
-  const strippedParts = lastMessage.parts.filter((p) => p.type !== 'image' && p.type !== 'file');
-  const placeholderParts: ContentPart[] =
-    strippedParts.length > 0 ? strippedParts : [{ type: 'text', text: "One moment, I'm attaching a file for you to look at." }];
-  const textOnlyMessages = input.messages.map((m, i) => (i === input.messages.length - 1 ? { ...m, parts: placeholderParts } : m));
-
   void (async () => {
-    await runTurn(session, { ...input, messages: textOnlyMessages });
-
-    const mounts: string[] = [];
-    for (const attachment of attachments) {
-      try {
-        const mountPath = await mountAttachment(session, attachment);
-        mounts.push(`${attachment.name ?? attachment.kind} is now at ${mountPath}`);
-      } catch (err) {
-        appendEvent(session, {
-          type: 'RUN_ERROR',
-          runId: input.runId,
-          error: {
-            code: 'attachment_mount_failed',
-            message: err instanceof Error ? err.message : String(err),
-            recoverable: true,
-            raw: err,
-          },
-        });
+    const mountNotes: string[] = [];
+    try {
+      if (session.realSessionId) {
+        // A session already exists for this thread -- mount straight into
+        // it, then send one turn. No need to pre-create anything.
+        for (const attachment of attachments) {
+          const mountPath = await mountOnExistingSession(session, attachment);
+          mountNotes.push(`${attachmentFilename(attachment)} → ${mountPath}`);
+        }
+      } else {
+        // No session yet for this thread. Creating one is normally
+        // something the adapter does lazily on the first turn -- pre-empt
+        // that so the files are already mounted before the agent ever sees
+        // this message, avoiding a separate "I don't see anything" turn.
+        const mountPaths = await createSessionWithAttachments(session, attachments);
+        for (const attachment of attachments) {
+          const mountPath = mountPaths.get(attachment);
+          if (mountPath) mountNotes.push(`${attachmentFilename(attachment)} → ${mountPath}`);
+        }
       }
+    } catch (err) {
+      appendRunError(session, input.runId, 'attachment_mount_failed', err, true);
     }
-    if (mounts.length === 0) return;
 
-    const followupMessage = {
-      id: randomUUID(),
-      role: 'user' as const,
-      createdAt: Date.now(),
-      streaming: false,
-      parts: [
-        {
-          type: 'text' as const,
-          text: `(System note: the file(s) you were just sent have been mounted into your workspace.)\n${mounts.join('\n')}\nPlease take a look and respond to the original message accordingly.`,
-        },
-      ],
-    };
-    await runTurn(session, {
-      threadId,
-      runId: randomUUID(),
-      messages: [...textOnlyMessages, followupMessage],
-      tools: input.tools,
-    });
+    const strippedParts = lastMessage.parts.filter((p) => p.type !== 'image' && p.type !== 'file');
+    const noteText =
+      mountNotes.length > 0
+        ? `\n\n(System note: the attached file(s) are available in your workspace at:\n${mountNotes.join('\n')})`
+        : '';
+    const finalParts: ContentPart[] =
+      strippedParts.length > 0 || !noteText
+        ? [...strippedParts, ...(noteText ? [{ type: 'text' as const, text: noteText.trim() }] : [])]
+        : [{ type: 'text', text: noteText.trim() }];
+    const finalMessages = input.messages.map((m, i) => (i === input.messages.length - 1 ? { ...m, parts: finalParts } : m));
+
+    await runTurn(session, { ...input, messages: finalMessages });
   })();
 }
 

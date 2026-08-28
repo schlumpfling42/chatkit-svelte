@@ -16,12 +16,13 @@ vi.mock('../src/lib/env', () => ({
 
 const mockFilesUpload = vi.fn();
 const mockResourcesAdd = vi.fn();
+const mockSessionsCreate = vi.fn();
 
 vi.mock('@anthropic-ai/sdk', () => ({
   default: vi.fn().mockImplementation(() => ({
     beta: {
       files: { upload: mockFilesUpload },
-      sessions: { resources: { add: mockResourcesAdd } },
+      sessions: { create: mockSessionsCreate, resources: { add: mockResourcesAdd } },
     },
   })),
   toFile: vi.fn(async (buffer: Buffer, name: string, opts: { type: string }) => ({ buffer, name, type: opts.type })),
@@ -45,12 +46,6 @@ function fakeObservable(events: ChatEvent[]) {
     },
   };
 }
-
-const SESSION_CUSTOM_EVENT = {
-  type: 'CUSTOM',
-  name: 'managed_agents.session',
-  value: { sessionId: 'sesn_test123', threadId: 't1' },
-};
 
 describe('agent-sessions', () => {
   beforeEach(async () => {
@@ -159,48 +154,60 @@ describe('agent-sessions', () => {
       tools: [],
     };
 
-    it('runs a text-only turn first, mounts the attachment once the real session id is known, then sends a follow-up turn', async () => {
-      const phase1Events: ChatEvent[] = [SESSION_CUSTOM_EVENT as unknown as ChatEvent, { type: 'RUN_FINISHED', runId: 'run-attach' }];
-      const phase2Events: ChatEvent[] = [{ type: 'TEXT_MESSAGE_CONTENT', messageId: 'm2', delta: 'nice image' }];
-      mockRun.mockReturnValueOnce(fakeObservable(phase1Events)).mockReturnValueOnce(fakeObservable(phase2Events));
+    it('pre-creates the real session with the attachment already mounted, then sends ONE turn (no separate follow-up)', async () => {
+      const responseEvents: ChatEvent[] = [{ type: 'TEXT_MESSAGE_CONTENT', messageId: 'm2', delta: 'nice image' }];
+      mockRun.mockReturnValueOnce(fakeObservable(responseEvents));
       mockFilesUpload.mockResolvedValue({ id: 'file_abc' });
-      mockResourcesAdd.mockResolvedValue({ mount_path: '/mnt/session/uploads/file_abc' });
+      mockSessionsCreate.mockResolvedValue({
+        id: 'sesn_test123',
+        resources: [{ type: 'file', file_id: 'file_abc', mount_path: '/mnt/session/uploads/file_abc' }],
+      });
 
       const { startRun, getOrCreateSession } = await import('../src/lib/agent-sessions');
       startRun('t1', attachInput);
-      // Two microtask/setTimeout(0) turns plus the upload/mount awaits — a
-      // couple of ticks is enough since everything here is mocked to resolve
-      // immediately, but give it a little room.
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // Phase 1 was sent text-only (image stripped) — the call args mirror
-      // AG-UI's own message shape (see toAguiMessages), so just check no
-      // image content part made it into either call's outgoing messages.
-      expect(mockRun).toHaveBeenCalledTimes(2);
-      const phase1Arg = mockRun.mock.calls[0][0];
-      expect(JSON.stringify(phase1Arg.messages)).not.toContain('image');
+      // A single real turn — no separate text-only-then-follow-up round trip.
+      expect(mockRun).toHaveBeenCalledTimes(1);
 
       expect(mockFilesUpload).toHaveBeenCalledTimes(1);
-      expect(mockResourcesAdd).toHaveBeenCalledWith('sesn_test123', { file_id: 'file_abc', type: 'file' });
+      expect(mockSessionsCreate).toHaveBeenCalledWith({
+        agent: 'agent_test',
+        environment_id: 'env_test',
+        resources: [{ type: 'file', file_id: 'file_abc' }],
+      });
+      expect(mockResourcesAdd).not.toHaveBeenCalled();
 
-      // Phase 2's outgoing messages should mention the real mount path.
-      const phase2Arg = mockRun.mock.calls[1][0];
-      expect(JSON.stringify(phase2Arg.messages)).toContain('/mnt/session/uploads/file_abc');
+      // The single outgoing turn should have the image stripped and the
+      // real resolved mount path mentioned, all in one message.
+      const arg = mockRun.mock.calls[0][0];
+      const serialized = JSON.stringify(arg.messages);
+      expect(serialized).not.toContain('"type":"image"');
+      expect(serialized).toContain('/mnt/session/uploads/file_abc');
 
       const session = getOrCreateSession('t1');
       expect(session.realSessionId).toBe('sesn_test123');
-      // fromAguiEvent wraps the raw CUSTOM event (it's not one of the types
-      // it maps explicitly) and fills RUN_FINISHED's optional `result` key —
-      // so the stored events aren't a byte-for-byte copy of the raw fixtures
-      // above, just their translated shape. Check that translation, plus
-      // that both phases' events all made it into the log in order.
-      expect(session.events).toHaveLength(3);
-      expect(session.events[0]).toEqual({ type: 'CUSTOM', name: 'agui:CUSTOM', payload: SESSION_CUSTOM_EVENT });
-      expect(session.events[1]).toEqual({ type: 'RUN_FINISHED', runId: 'run-attach', result: undefined });
-      expect(session.events[2]).toEqual(phase2Events[0]);
+      expect(session.events).toEqual(responseEvents);
     });
 
-    it('uses placeholder text for the first turn when the message is an attachment with no text', async () => {
+    it('mounts directly onto an already-existing session (no pre-create) when one is already known for the thread', async () => {
+      const { startRun, getOrCreateSession } = await import('../src/lib/agent-sessions');
+      const session = getOrCreateSession('t1');
+      session.realSessionId = 'sesn_existing';
+
+      mockRun.mockReturnValueOnce(fakeObservable([]));
+      mockFilesUpload.mockResolvedValue({ id: 'file_abc' });
+      mockResourcesAdd.mockResolvedValue({ mount_path: '/mnt/session/uploads/file_abc' });
+
+      startRun('t1', attachInput);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(mockSessionsCreate).not.toHaveBeenCalled();
+      expect(mockResourcesAdd).toHaveBeenCalledWith('sesn_existing', { file_id: 'file_abc', type: 'file' });
+      expect(mockRun).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses placeholder text when the message is an attachment with no text at all', async () => {
       const attachOnlyInput: RunAgentInput = {
         threadId: 't1',
         runId: 'run-attach-only',
@@ -215,31 +222,35 @@ describe('agent-sessions', () => {
         ],
         tools: [],
       };
-      mockRun
-        .mockReturnValueOnce(fakeObservable([SESSION_CUSTOM_EVENT as unknown as ChatEvent, { type: 'RUN_FINISHED', runId: 'run-attach-only' }]))
-        .mockReturnValueOnce(fakeObservable([]));
+      mockRun.mockReturnValueOnce(fakeObservable([]));
       mockFilesUpload.mockResolvedValue({ id: 'file_pdf' });
-      mockResourcesAdd.mockResolvedValue({ mount_path: '/mnt/session/uploads/file_pdf' });
+      mockSessionsCreate.mockResolvedValue({
+        id: 'sesn_test123',
+        resources: [{ type: 'file', file_id: 'file_pdf', mount_path: '/mnt/session/uploads/file_pdf' }],
+      });
 
       const { startRun } = await import('../src/lib/agent-sessions');
       startRun('t1', attachOnlyInput);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const phase1Arg = mockRun.mock.calls[0][0];
-      expect(JSON.stringify(phase1Arg.messages)).toContain("attaching a file");
+      const arg = mockRun.mock.calls[0][0];
+      // No original text existed, so the only text present should be the
+      // system note about the mount path (still no placeholder "attaching a
+      // file" filler needed now that mounting happens before the turn).
+      expect(JSON.stringify(arg.messages)).toContain('/mnt/session/uploads/file_pdf');
     });
 
-    it('appends a recoverable RUN_ERROR and skips the follow-up turn when mounting fails', async () => {
-      mockRun.mockReturnValueOnce(
-        fakeObservable([SESSION_CUSTOM_EVENT as unknown as ChatEvent, { type: 'RUN_FINISHED', runId: 'run-attach' }])
-      );
+    it('appends a recoverable RUN_ERROR and still sends the turn (without a mount note) when uploading fails', async () => {
+      mockRun.mockReturnValueOnce(fakeObservable([]));
       mockFilesUpload.mockRejectedValue(new Error('upload failed'));
 
       const { startRun, getOrCreateSession } = await import('../src/lib/agent-sessions');
       startRun('t1', attachInput);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // Only the phase-1 call — no follow-up turn since nothing mounted.
+      expect(mockSessionsCreate).not.toHaveBeenCalled();
+      // The turn still goes out (text-only, since nothing mounted) rather
+      // than being silently dropped.
       expect(mockRun).toHaveBeenCalledTimes(1);
       const session = getOrCreateSession('t1');
       const errorEvent = session.events.find((e) => e.type === 'RUN_ERROR');
@@ -261,9 +272,7 @@ describe('agent-sessions', () => {
         ],
         tools: [],
       };
-      mockRun.mockReturnValueOnce(
-        fakeObservable([SESSION_CUSTOM_EVENT as unknown as ChatEvent, { type: 'RUN_FINISHED', runId: 'run-attach-url' }])
-      );
+      mockRun.mockReturnValueOnce(fakeObservable([]));
 
       const { startRun, getOrCreateSession } = await import('../src/lib/agent-sessions');
       startRun('t1', nonDataUriInput);
