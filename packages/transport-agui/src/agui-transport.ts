@@ -25,6 +25,17 @@ interface StateMirrorRef {
   value: unknown;
 }
 
+// `new URL(str)` throws for a relative `str` unless a base is supplied — but
+// `options.endpoint` is legitimately relative for the common case of a
+// same-origin app pointing the transport at its own API routes (e.g.
+// '/api/agent'). Per the URL spec, a base is *ignored* (not required) when
+// the first argument is already absolute, so it's always safe to pass one.
+// `location` only exists in a browser; the Node-only test suite always uses
+// a fully-qualified http:// endpoint, so `undefined` there is fine too.
+function urlBase(): string | undefined {
+  return typeof location !== 'undefined' ? location.href : undefined;
+}
+
 export function createAguiTransport(options: AguiTransportOptions): ChatTransport {
   const fetchImpl = options.fetchImpl ?? fetch;
   const WebSocketImpl = options.WebSocketImpl ?? WebSocket;
@@ -73,7 +84,7 @@ export function createAguiTransport(options: AguiTransportOptions): ChatTranspor
 
     while (!disposed) {
       activeAbortController = new AbortController();
-      const url = new URL(`${options.endpoint}/threads/${encodeURIComponent(session.threadId)}/events`);
+      const url = new URL(`${options.endpoint}/threads/${encodeURIComponent(session.threadId)}/events`, urlBase());
       if (resumeToken) url.searchParams.set('resumeToken', resumeToken);
       const connectStartedAt = Date.now();
 
@@ -136,7 +147,7 @@ export function createAguiTransport(options: AguiTransportOptions): ChatTranspor
   }
 
   function toWebSocketUrl(threadId: string): string {
-    const url = new URL(`${options.endpoint}/threads/${encodeURIComponent(threadId)}/events`);
+    const url = new URL(`${options.endpoint}/threads/${encodeURIComponent(threadId)}/events`, urlBase());
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     return url.toString();
   }

@@ -49,6 +49,36 @@ describe('createAguiTransport — connect', () => {
     expect(second.value).toEqual({ type: 'RUN_FINISHED', runId: 'r1' });
   });
 
+  it('connects successfully when endpoint is a relative path resolved against location (same-origin app config)', async () => {
+    const { server, endpoint } = await startServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      res.write(sseFrame({ type: 'RUN_STARTED', runId: 'r1', threadId: 't1' }, '1'));
+      res.end();
+    });
+    activeServer = server;
+
+    // `new URL('/api/agent/...')` throws without a base — this reproduces
+    // the real bug found via apps/managed-agent-demo's live browser testing:
+    // a relative `endpoint` (the natural way for a same-origin app to point
+    // the transport at its own API routes) silently broke connect() with no
+    // request ever leaving the client and no visible error, because every
+    // *other* test here (and the whole rest of the suite) only ever used a
+    // fully-qualified http:// endpoint. Stubbing `location` is what a real
+    // browser provides for free; Node has no global `location`.
+    const originalLocation = (globalThis as { location?: unknown }).location;
+    (globalThis as { location?: unknown }).location = { href: `${endpoint}/` };
+    try {
+      const transport = createAguiTransport({ endpoint: '/api/agent' });
+      const generator = transport.connect({ threadId: 't1' })[Symbol.asyncIterator]();
+      const first = await generator.next();
+      transport.dispose();
+
+      expect(first.value).toEqual({ type: 'RUN_STARTED', runId: 'r1', threadId: 't1' });
+    } finally {
+      (globalThis as { location?: unknown }).location = originalLocation;
+    }
+  });
+
   it('reconnects with the last-seen frame id as resumeToken after a dropped connection', async () => {
     let connectionCount = 0;
     const seenResumeTokens: (string | null)[] = [];
