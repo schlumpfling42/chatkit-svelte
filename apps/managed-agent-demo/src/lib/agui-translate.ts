@@ -6,9 +6,16 @@ interface AguiToolCall {
   function: { name: string; arguments: string };
 }
 
+type AguiInputSource = { type: 'data'; value: string; mimeType: string } | { type: 'url'; value: string; mimeType?: string };
+
+type AguiUserContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image'; source: AguiInputSource }
+  | { type: 'document'; source: AguiInputSource };
+
 export type AguiMessage =
   | { id: string; role: 'system'; content: string }
-  | { id: string; role: 'user'; content: string }
+  | { id: string; role: 'user'; content: string | AguiUserContentPart[] }
   | { id: string; role: 'assistant'; content?: string; toolCalls?: AguiToolCall[] }
   | { id: string; role: 'tool'; content: string; toolCallId: string };
 
@@ -17,6 +24,38 @@ function textOf(parts: ContentPart[]): string {
     .filter((p): p is Extract<ContentPart, { type: 'text' }> => p.type === 'text')
     .map((p) => p.text)
     .join('');
+}
+
+const DATA_URI = /^data:([^;,]+)(?:;charset=[^;,]+)?;base64,(.+)$/s;
+
+// chatkit's image/file ContentParts carry only a `url` string. This demo's
+// upload() (+page.svelte) returns a base64 data: URI rather than a real
+// hosted URL, since there's no file-hosting backend here and a blob: URL
+// (the more obvious browser API) is scoped to the browser tab that created
+// it -- unreachable from both the SvelteKit server process that runs this
+// translation and Anthropic's remote sandbox. AG-UI's own schema has a
+// `data` source variant precisely for inlining bytes like this; `url` stays
+// as a fallback for a real deployment that does host attachments.
+function toAguiSource(url: string, mimeType: string): AguiInputSource {
+  const match = DATA_URI.exec(url);
+  if (match) return { type: 'data', value: match[2], mimeType: match[1] };
+  return { type: 'url', value: url, mimeType };
+}
+
+function toAguiUserContent(parts: ContentPart[]): string | AguiUserContentPart[] {
+  const hasAttachment = parts.some((p) => p.type === 'image' || p.type === 'file');
+  if (!hasAttachment) return textOf(parts);
+  const result: AguiUserContentPart[] = [];
+  for (const part of parts) {
+    if (part.type === 'text') {
+      result.push({ type: 'text', text: part.text });
+    } else if (part.type === 'image') {
+      result.push({ type: 'image', source: toAguiSource(part.url, part.mimeType) });
+    } else if (part.type === 'file') {
+      result.push({ type: 'document', source: toAguiSource(part.url, part.mimeType) });
+    }
+  }
+  return result;
 }
 
 function toolCallsOf(parts: ContentPart[]): AguiToolCall[] {
@@ -41,7 +80,7 @@ export function toAguiMessages(messages: Message[]): AguiMessage[] {
       return { id: message.id, role: 'system', content: textOf(message.parts) };
     }
     if (message.role === 'user') {
-      return { id: message.id, role: 'user', content: textOf(message.parts) };
+      return { id: message.id, role: 'user', content: toAguiUserContent(message.parts) };
     }
     if (message.role === 'tool') {
       const toolCallPart = message.parts.find(

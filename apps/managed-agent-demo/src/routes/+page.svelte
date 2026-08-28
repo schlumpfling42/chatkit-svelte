@@ -12,13 +12,27 @@
 
   const devtools = devtoolsPlugin();
 
+  // Returns a base64 data: URI rather than URL.createObjectURL()'s blob:
+  // URL. This demo has no real file-hosting backend, and a blob: URL is
+  // scoped to this browser tab -- unreachable from both the SvelteKit
+  // server (where src/lib/agui-translate.ts runs) and Anthropic's remote
+  // sandbox, so the agent would never actually see the attachment's bytes.
+  function readAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
   const config: ChatConfig = {
     threadId: crypto.randomUUID(),
     transport: createAguiTransport({ endpoint: '/api/agent' }),
     plugins: [
       toolRenderPlugin(),
       markdownPlugin(),
-      fileHandlingPlugin({ upload: async (file) => ({ url: URL.createObjectURL(file) }) }),
+      fileHandlingPlugin({ upload: async (file) => ({ url: await readAsDataUrl(file) }) }),
       formsPlugin(),
       documentsPlugin(),
       devtools,

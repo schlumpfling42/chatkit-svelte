@@ -10,6 +10,69 @@ describe('toAguiMessages', () => {
     expect(toAguiMessages(messages)).toEqual([{ id: 'm1', role: 'user', content: 'hello' }]);
   });
 
+  it('translates a user message with an image attachment (data: URI) into AG-UI content parts, not a dropped string', () => {
+    const messages: Message[] = [
+      {
+        id: 'm1b',
+        role: 'user',
+        parts: [
+          { type: 'text', text: 'what is this?' },
+          { type: 'image', url: 'data:image/png;base64,iVBORw0KGgo=', mimeType: 'image/png' },
+        ],
+        createdAt: 0,
+        streaming: false,
+      },
+    ];
+    expect(toAguiMessages(messages)).toEqual([
+      {
+        id: 'm1b',
+        role: 'user',
+        content: [
+          { type: 'text', text: 'what is this?' },
+          { type: 'image', source: { type: 'data', value: 'iVBORw0KGgo=', mimeType: 'image/png' } },
+        ],
+      },
+    ]);
+  });
+
+  it('translates a user message with a file attachment into an AG-UI document content part', () => {
+    const messages: Message[] = [
+      {
+        id: 'm1c',
+        role: 'user',
+        parts: [{ type: 'file', url: 'data:application/pdf;base64,JVBERi0=', name: 'report.pdf', mimeType: 'application/pdf', sizeBytes: 4 }],
+        createdAt: 0,
+        streaming: false,
+      },
+    ];
+    expect(toAguiMessages(messages)).toEqual([
+      {
+        id: 'm1c',
+        role: 'user',
+        content: [{ type: 'document', source: { type: 'data', value: 'JVBERi0=', mimeType: 'application/pdf' } }],
+      },
+    ]);
+  });
+
+  it('falls back to a plain url source for a non-data: attachment URL', () => {
+    const messages: Message[] = [
+      {
+        id: 'm1d',
+        role: 'user',
+        parts: [{ type: 'image', url: 'https://example.com/cat.png', mimeType: 'image/png' }],
+        createdAt: 0,
+        streaming: false,
+      },
+    ];
+    expect(toAguiMessages(messages)).toEqual([
+      {
+        id: 'm1d',
+        role: 'user',
+        content: [{ type: 'image', source: { type: 'url', value: 'https://example.com/cat.png', mimeType: 'image/png' } }],
+      },
+    ]);
+  });
+
   it('translates an assistant message with a tool call into content + toolCalls', () => {
     const messages: Message[] = [
       {

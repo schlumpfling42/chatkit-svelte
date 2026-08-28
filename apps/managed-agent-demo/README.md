@@ -40,6 +40,18 @@ Open the printed local URL and chat with your Managed Agent.
 
 ## Known limitations
 
+- **File/image attachments don't reach the agent.** `src/lib/agui-translate.ts`
+  correctly builds the AG-UI-spec multimodal content array for attachments
+  (`{type: 'image', source: {type: 'data', value, mimeType}}` etc., per
+  `@ag-ui/core`'s real schema) — but the installed `@ag-ui/claude-managed-agents@0.0.1`
+  adapter's own outbound-message builder only ever extracts `.text` fields
+  from a message's content array, silently dropping anything else, and never
+  passes a `resources` parameter to `sessions.create()` either. This is a gap
+  in that package version, not something fixable from this app's side — the
+  attach button and upload pipeline work (verified: the browser correctly
+  reads the file and includes it in the outgoing message), but the agent
+  itself never receives the bytes, and will say so if asked. Re-test once a
+  newer `@ag-ui/claude-managed-agents` version adds real support.
 - In-memory session storage only — restarting the dev server drops in-flight
   threads. Fine for a demo; would need a persisted store for production.
 - No authentication — AG-UI thread IDs are not bound to user identity here.
