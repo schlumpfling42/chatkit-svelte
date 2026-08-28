@@ -38,20 +38,38 @@ pnpm --filter managed-agent-demo dev
 
 Open the printed local URL and chat with your Managed Agent.
 
+## File attachments
+
+Attachments genuinely reach the agent, but not via AG-UI message content —
+`@ag-ui/claude-managed-agents@0.0.1`'s outbound-message builder only ever
+extracts `.text` fields, silently dropping anything else, and Managed
+Agents' real API doesn't accept inline images/files in a `user.message`
+event at all (confirmed against Anthropic's own docs — this isn't a bug in
+that package, the real API just doesn't work that way).
+
+Managed Agents' actual attachment mechanism is `sessions.resources.add()`:
+upload the file via the Files API, then mount it into the *already-running*
+session's sandbox filesystem. `@ag-ui/claude-managed-agents` doesn't expose
+this at all, so `src/lib/agent-sessions.ts` talks to the same underlying
+`@anthropic-ai/sdk` client directly, alongside the adapter, in two steps
+whenever a message carries an attachment:
+
+1. Send the turn text-only first (attachments stripped; a placeholder line
+   if that leaves nothing to send) — this is what actually creates the real
+   Anthropic session if one doesn't exist yet, and its `managed_agents.session`
+   CUSTOM event is how we learn the real session id, which the adapter
+   never surfaces on its own.
+2. Upload each attachment (`files.upload`) and mount it
+   (`sessions.resources.add`, default path `/mnt/session/uploads/<file_id>`),
+   then send a short follow-up turn telling the agent where to find them.
+
+Verified live: an attached image is correctly read by the agent's own `read`/
+`bash` tools from the real mounted path and analyzed pixel-by-pixel — not
+hallucinated. See the "attachments" describe block in
+`test/agent-sessions.test.ts` for the mocked version of this flow.
+
 ## Known limitations
 
-- **File/image attachments don't reach the agent.** `src/lib/agui-translate.ts`
-  correctly builds the AG-UI-spec multimodal content array for attachments
-  (`{type: 'image', source: {type: 'data', value, mimeType}}` etc., per
-  `@ag-ui/core`'s real schema) — but the installed `@ag-ui/claude-managed-agents@0.0.1`
-  adapter's own outbound-message builder only ever extracts `.text` fields
-  from a message's content array, silently dropping anything else, and never
-  passes a `resources` parameter to `sessions.create()` either. This is a gap
-  in that package version, not something fixable from this app's side — the
-  attach button and upload pipeline work (verified: the browser correctly
-  reads the file and includes it in the outgoing message), but the agent
-  itself never receives the bytes, and will say so if asked. Re-test once a
-  newer `@ag-ui/claude-managed-agents` version adds real support.
 - In-memory session storage only — restarting the dev server drops in-flight
   threads. Fine for a demo; would need a persisted store for production.
 - No authentication — AG-UI thread IDs are not bound to user identity here.
