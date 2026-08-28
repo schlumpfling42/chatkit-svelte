@@ -9,6 +9,8 @@ export const defaultMessages: Record<string, string> = {
   'composer.inputLabel': 'Message',
   'composer.send': 'Send',
   'composer.attach': 'Attach',
+  'composer.removeAttachment': 'Remove attachment',
+  'composer.attachmentImage': 'Image',
   'approvalBar.approve': 'Approve',
   'approvalBar.reject': 'Reject',
   'approvalBar.edit': 'Edit',

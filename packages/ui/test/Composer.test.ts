@@ -68,6 +68,101 @@ describe('Composer — attachments', () => {
 
     expect(process).not.toHaveBeenCalled();
   });
+
+  it('shows a pending-attachment chip with the filename as soon as a file is picked, before sending', async () => {
+    const transport = createFixtureTransport([]);
+    const process = vi.fn(async () => ({ type: 'file' as const, url: 'https://x/y', name: 'report.pdf', mimeType: 'application/pdf' }));
+    const plugin: ChatPlugin = {
+      name: 'attach-test',
+      version: '1.0.0',
+      attachmentHandlers: [{ accept: ['application/pdf'], process }],
+    };
+    render(ComposerHarness, { config: { transport, threadId: 't1', plugins: [plugin] } });
+
+    const fileInput = screen.getByLabelText('Attach file', { selector: 'input' }) as HTMLInputElement;
+    const file = new File(['hello'], 'report.pdf', { type: 'application/pdf' });
+    await fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByText('report.pdf')).toBeInTheDocument();
+    });
+    // Nothing sent yet — the chip appearing must not itself trigger a send.
+    expect(transport.recorder.runs).toHaveLength(0);
+  });
+
+  it('shows a generic "Image" label (not a crash) for an image attachment, which has no name field', async () => {
+    const transport = createFixtureTransport([]);
+    const process = vi.fn(async () => ({ type: 'image' as const, url: 'data:image/png;base64,abc', mimeType: 'image/png' }));
+    const plugin: ChatPlugin = {
+      name: 'attach-test',
+      version: '1.0.0',
+      attachmentHandlers: [{ accept: ['image/*'], process }],
+    };
+    render(ComposerHarness, { config: { transport, threadId: 't1', plugins: [plugin] } });
+
+    const fileInput = screen.getByLabelText('Attach file', { selector: 'input' }) as HTMLInputElement;
+    const file = new File(['hello'], 'photo.png', { type: 'image/png' });
+    await fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByText('Image')).toBeInTheDocument();
+    });
+  });
+
+  it('removing a pending attachment before sending excludes it from the next sendMessage', async () => {
+    const transport = createFixtureTransport([]);
+    const process = vi.fn(async () => ({ type: 'file' as const, url: 'https://x/y', name: 'report.pdf', mimeType: 'application/pdf' }));
+    const plugin: ChatPlugin = {
+      name: 'attach-test',
+      version: '1.0.0',
+      attachmentHandlers: [{ accept: ['application/pdf'], process }],
+    };
+    render(ComposerHarness, { config: { transport, threadId: 't1', plugins: [plugin] } });
+
+    const fileInput = screen.getByLabelText('Attach file', { selector: 'input' }) as HTMLInputElement;
+    const file = new File(['hello'], 'report.pdf', { type: 'application/pdf' });
+    await fireEvent.change(fileInput, { target: { files: [file] } });
+    await waitFor(() => {
+      expect(screen.getByText('report.pdf')).toBeInTheDocument();
+    });
+
+    await fireEvent.click(screen.getByLabelText('Remove attachment'));
+    expect(screen.queryByText('report.pdf')).not.toBeInTheDocument();
+
+    const input = screen.getByLabelText('Message') as HTMLInputElement;
+    await fireEvent.input(input, { target: { value: 'hi' } });
+    await fireEvent.submit(fileInput.closest('form')!);
+
+    await waitFor(() => {
+      expect(transport.recorder.runs).toHaveLength(1);
+    });
+    expect(transport.recorder.runs[0].messages[0].parts).toEqual([{ type: 'text', text: 'hi' }]);
+  });
+
+  it('clears the pending-attachment chip after a successful send', async () => {
+    const transport = createFixtureTransport([]);
+    const process = vi.fn(async () => ({ type: 'file' as const, url: 'https://x/y', name: 'report.pdf', mimeType: 'application/pdf' }));
+    const plugin: ChatPlugin = {
+      name: 'attach-test',
+      version: '1.0.0',
+      attachmentHandlers: [{ accept: ['application/pdf'], process }],
+    };
+    render(ComposerHarness, { config: { transport, threadId: 't1', plugins: [plugin] } });
+
+    const fileInput = screen.getByLabelText('Attach file', { selector: 'input' }) as HTMLInputElement;
+    const file = new File(['hello'], 'report.pdf', { type: 'application/pdf' });
+    await fireEvent.change(fileInput, { target: { files: [file] } });
+    await waitFor(() => {
+      expect(screen.getByText('report.pdf')).toBeInTheDocument();
+    });
+
+    await fireEvent.submit(fileInput.closest('form')!);
+
+    await waitFor(() => {
+      expect(transport.recorder.runs).toHaveLength(1);
+    });
+    expect(screen.queryByText('report.pdf')).not.toBeInTheDocument();
+  });
 });
 
 describe('Composer — class prop, i18n, focus', () => {

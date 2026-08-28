@@ -31,6 +31,10 @@
     pendingAttachments = [...pendingAttachments, part];
   }
 
+  function removeAttachment(index: number) {
+    pendingAttachments = pendingAttachments.filter((_, i) => i !== index);
+  }
+
   async function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
     const value = text.trim();
@@ -44,35 +48,117 @@
 </script>
 
 <form class="ck-composer {className ?? ''}" onsubmit={handleSubmit}>
-  {#if hasAttachmentHandlers}
-    <input
-      type="file"
-      bind:this={fileInput}
-      onchange={handleFileChange}
-      class="ck-composer__file-input"
-      aria-label="Attach file"
-    />
-    <button type="button" class="ck-composer__attach" onclick={() => fileInput?.click()} aria-label={store.t('composer.attach')}>📎</button>
+  {#if pendingAttachments.length > 0}
+    <ul class="ck-composer__attachments" aria-live="polite">
+      {#each pendingAttachments as attachment, index (index)}
+        <li class="ck-composer__attachment-chip">
+          {#if attachment.type === 'image'}
+            <img src={attachment.url} alt={attachment.alt ?? ''} class="ck-composer__attachment-thumb" />
+          {:else}
+            <span class="ck-composer__attachment-icon" aria-hidden="true">📄</span>
+          {/if}
+          <span class="ck-composer__attachment-name">
+            {attachment.type === 'file' ? attachment.name : store.t('composer.attachmentImage')}
+          </span>
+          <button
+            type="button"
+            class="ck-composer__attachment-remove"
+            onclick={() => removeAttachment(index)}
+            aria-label={store.t('composer.removeAttachment')}
+          >
+            ×
+          </button>
+        </li>
+      {/each}
+    </ul>
   {/if}
-  <input
-    id="ck-composer-input"
-    bind:this={inputEl}
-    class="ck-composer__input"
-    bind:value={text}
-    placeholder={store.t('composer.placeholder')}
-    aria-label={store.t('composer.inputLabel')}
-  />
-  <button class="ck-composer__send" type="submit">{store.t('composer.send')}</button>
+  <div class="ck-composer__row">
+    {#if hasAttachmentHandlers}
+      <input
+        type="file"
+        bind:this={fileInput}
+        onchange={handleFileChange}
+        class="ck-composer__file-input"
+        aria-label="Attach file"
+      />
+      <button type="button" class="ck-composer__attach" onclick={() => fileInput?.click()} aria-label={store.t('composer.attach')}>📎</button>
+    {/if}
+    <input
+      id="ck-composer-input"
+      bind:this={inputEl}
+      class="ck-composer__input"
+      bind:value={text}
+      placeholder={store.t('composer.placeholder')}
+      aria-label={store.t('composer.inputLabel')}
+    />
+    <button class="ck-composer__send" type="submit">{store.t('composer.send')}</button>
+  </div>
 </form>
 
 <style>
   .ck-composer {
     display: flex;
-    flex-direction: row;
-    align-items: center;
+    flex-direction: column;
     gap: var(--ck-space-2);
     padding: var(--ck-space-3);
     border-top: 1px solid var(--ck-color-border);
+  }
+
+  .ck-composer__row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--ck-space-2);
+  }
+
+  .ck-composer__attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ck-space-2);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .ck-composer__attachment-chip {
+    display: flex;
+    align-items: center;
+    gap: var(--ck-space-1);
+    max-width: 12rem;
+    padding: var(--ck-space-1) var(--ck-space-2);
+    border: 1px solid var(--ck-color-border);
+    border-radius: var(--ck-radius-sm);
+    background: var(--ck-color-surface);
+    font-size: var(--ck-font-size-sm);
+  }
+
+  .ck-composer__attachment-thumb {
+    width: 1.25rem;
+    height: 1.25rem;
+    object-fit: cover;
+    border-radius: var(--ck-radius-sm);
+    flex-shrink: 0;
+  }
+
+  .ck-composer__attachment-icon {
+    flex-shrink: 0;
+  }
+
+  .ck-composer__attachment-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ck-composer__attachment-remove {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 0 0 var(--ck-space-1);
+    color: var(--ck-color-text-muted);
+    font-size: 1rem;
   }
 
   .ck-composer__file-input {
