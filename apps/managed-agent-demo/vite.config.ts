@@ -10,6 +10,11 @@ const CHATKIT_PACKAGES = [
   '@chatkit-svelte/ui',
   '@chatkit-svelte/transport-agui',
   '@chatkit-svelte/plugin-tool-render',
+  '@chatkit-svelte/plugin-markdown',
+  '@chatkit-svelte/plugin-file-handling',
+  '@chatkit-svelte/plugin-forms',
+  '@chatkit-svelte/plugin-documents',
+  '@chatkit-svelte/plugin-devtools',
 ];
 
 export default defineConfig(({ mode }) => {

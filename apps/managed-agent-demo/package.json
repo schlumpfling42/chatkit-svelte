@@ -18,6 +18,11 @@
     "@chatkit-svelte/ui": "workspace:*",
     "@chatkit-svelte/transport-agui": "workspace:*",
     "@chatkit-svelte/plugin-tool-render": "workspace:*",
+    "@chatkit-svelte/plugin-markdown": "workspace:*",
+    "@chatkit-svelte/plugin-file-handling": "workspace:*",
+    "@chatkit-svelte/plugin-forms": "workspace:*",
+    "@chatkit-svelte/plugin-documents": "workspace:*",
+    "@chatkit-svelte/plugin-devtools": "workspace:*",
     "@ag-ui/claude-managed-agents": "^0.0.1",
     "@anthropic-ai/sdk": "^0.109.0"
   },

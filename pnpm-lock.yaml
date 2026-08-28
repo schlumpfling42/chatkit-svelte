@@ -29,6 +29,21 @@ importers:
       '@chatkit-svelte/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@chatkit-svelte/plugin-devtools':
+        specifier: workspace:*
+        version: link:../../packages/plugin-devtools
+      '@chatkit-svelte/plugin-documents':
+        specifier: workspace:*
+        version: link:../../packages/plugin-documents
+      '@chatkit-svelte/plugin-file-handling':
+        specifier: workspace:*
+        version: link:../../packages/plugin-file-handling
+      '@chatkit-svelte/plugin-forms':
+        specifier: workspace:*
+        version: link:../../packages/plugin-forms
+      '@chatkit-svelte/plugin-markdown':
+        specifier: workspace:*
+        version: link:../../packages/plugin-markdown
       '@chatkit-svelte/plugin-tool-render':
         specifier: workspace:*
         version: link:../../packages/plugin-tool-render
