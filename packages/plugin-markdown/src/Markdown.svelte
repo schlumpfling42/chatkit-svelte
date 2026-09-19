@@ -15,6 +15,10 @@
   {#each blocks as block}
     {#if block.type === 'paragraph'}
       <p>{#each block.children as node}<InlineNode {node} />{/each}</p>
+    {:else if block.type === 'rule'}
+      <hr />
+    {:else if block.type === 'quote'}
+      <blockquote>{#each block.children as node}<InlineNode {node} />{/each}</blockquote>
     {:else if block.type === 'code'}
       <pre><code data-lang={block.lang}>{block.text}</code></pre>
     {:else if block.type === 'heading'}
@@ -104,6 +108,19 @@
   .ck-markdown :global(ul:last-child),
   .ck-markdown :global(ol:last-child) {
     margin-bottom: 0;
+  }
+
+  .ck-markdown :global(hr) {
+    border: 0;
+    border-top: 1px solid var(--ck-color-border);
+    margin: var(--ck-space-3) 0;
+  }
+
+  .ck-markdown :global(blockquote) {
+    margin: 0 0 var(--ck-space-2) 0;
+    padding-inline-start: var(--ck-space-3);
+    border-inline-start: 3px solid var(--ck-color-border);
+    color: var(--ck-color-text-muted);
   }
 
   .ck-markdown__table-wrap {

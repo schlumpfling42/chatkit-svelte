@@ -71,6 +71,24 @@ describe('Markdown', () => {
     expect(adaCell.closest('table')).not.toBeNull();
   });
 
+  it('never makes a javascript: link clickable, but still shows its label', () => {
+    render(Markdown, { part: { type: 'text', text: 'try [click me](javascript:alert(1)) now' } });
+
+    expect(screen.getByText(/click me/)).toBeInTheDocument();
+    expect(document.querySelector('a')).toBeNull();
+  });
+
+  it('renders <br>, ~~strike~~, rules, quotes and LaTeX arrows as real elements and symbols', () => {
+    render(Markdown, { part: { type: 'text', text: 'line one<br>line two ~~old~~ $\\rightarrow$ new\n\n---\n\n> wise words' } });
+
+    expect(document.querySelector('br')).not.toBeNull();
+    expect(screen.getByText('old').tagName).toBe('DEL');
+    expect(document.querySelector('hr')).not.toBeNull();
+    expect(screen.getByText('wise words').tagName).toBe('BLOCKQUOTE');
+    expect(document.body.textContent).toContain('→');
+    expect(document.body.textContent).not.toContain('rightarrow');
+  });
+
   it('applies column alignment from the separator row as a style', () => {
     render(Markdown, { part: { type: 'text', text: '| A |\n|---:|\n| 1 |' } });
     const cell = screen.getByText('1');
