@@ -7,5 +7,6 @@ export * from './plugin-host';
 export * from './human-in-the-loop';
 export * from './persistence';
 export * from './i18n';
+export * from './files';
 export { createFixtureTransport } from './testing/fixture-transport';
 export type { FixtureTransportOptions, FixtureTransportRecorder } from './testing/fixture-transport';

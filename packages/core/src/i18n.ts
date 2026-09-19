@@ -11,6 +11,9 @@ export const defaultMessages: Record<string, string> = {
   'composer.attach': 'Attach',
   'composer.removeAttachment': 'Remove attachment',
   'composer.attachmentImage': 'Image',
+  'composer.attachmentUnsupported': '“{name}” can’t be attached: that file type isn’t supported here. Supported: {types}.',
+  'composer.attachmentTooLarge': '“{name}” is too large (the limit is {max}).',
+  'composer.attachmentFailed': '“{name}” couldn’t be attached.',
   'approvalBar.approve': 'Approve',
   'approvalBar.reject': 'Reject',
   'approvalBar.edit': 'Edit',
@@ -27,6 +30,7 @@ export const defaultMessages: Record<string, string> = {
   'fileRequest.attach': 'Attach file',
   'fileRequest.unsupportedType': 'That file type isn’t accepted here.',
   'fileRequest.tooLarge': 'That file is too large.',
+  'fileRequest.failed': 'That file couldn’t be uploaded. Try again.',
   'fileRequest.pending': 'Waiting for a file…',
 };
 

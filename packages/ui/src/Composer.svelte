@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getChatContext } from '@chatkit-svelte/svelte';
+  import { formatBytes, inferMimeType, matchesAccept } from '@chatkit-svelte/core';
   import type { ContentPart } from '@chatkit-svelte/core';
 
   interface Props {
@@ -20,23 +21,42 @@
   // back as a hard error there instead of a friendly local no-op.
   const isRunning = $derived(store.state.runStatus === 'running');
 
-  function matchesAccept(mimeType: string, patterns: string[]): boolean {
-    return patterns.some((pattern) => (pattern.endsWith('/*') ? mimeType.startsWith(pattern.slice(0, -1)) : mimeType === pattern));
-  }
+  // Why the last picked file could not be attached. A file that is silently dropped looks exactly like a
+  // broken button, so every refusal says so (and why).
+  let attachError = $state('');
 
   async function handleFileChange(event: Event) {
+    attachError = '';
     const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
+    const picked = input.files?.[0];
     input.value = '';
-    if (!file) return;
-    const handler = store.registry.attachmentHandlers.find((h) => matchesAccept(file.type, h.accept));
-    if (!handler) return;
-    if (handler.maxSizeBytes && file.size > handler.maxSizeBytes) return;
-    const part = await handler.process(file, {});
-    pendingAttachments = [...pendingAttachments, part];
+    if (!picked) return;
+
+    // The browser's idea of a file's type comes from the OS and is often empty (.md, .yaml, .log on Windows)
+    // or wrong (.csv claimed by Excel). Go by the extension in those cases.
+    const type = inferMimeType(picked);
+    const file = type === picked.type ? picked : new File([picked], picked.name, { type, lastModified: picked.lastModified });
+
+    const handlers = store.registry.attachmentHandlers;
+    const handler = handlers.find((h) => matchesAccept(file.type, h.accept));
+    if (!handler) {
+      attachError = store.t('composer.attachmentUnsupported', { name: file.name, types: [...new Set(handlers.flatMap((h) => h.accept))].join(', ') });
+      return;
+    }
+    if (handler.maxSizeBytes && file.size > handler.maxSizeBytes) {
+      attachError = store.t('composer.attachmentTooLarge', { name: file.name, max: formatBytes(handler.maxSizeBytes) });
+      return;
+    }
+    try {
+      const part = await handler.process(file, {});
+      pendingAttachments = [...pendingAttachments, part];
+    } catch {
+      attachError = store.t('composer.attachmentFailed', { name: file.name });
+    }
   }
 
   function removeAttachment(index: number) {
+    attachError = '';
     pendingAttachments = pendingAttachments.filter((_, i) => i !== index);
   }
 
@@ -54,6 +74,9 @@
 </script>
 
 <form class="ck-composer {className ?? ''}" onsubmit={handleSubmit}>
+  {#if attachError}
+    <p class="ck-composer__error" role="alert">{attachError}</p>
+  {/if}
   {#if pendingAttachments.length > 0}
     <ul class="ck-composer__attachments" aria-live="polite">
       {#each pendingAttachments as attachment, index (index)}
@@ -115,6 +138,16 @@
     flex-direction: row;
     align-items: center;
     gap: var(--ck-space-2);
+  }
+
+  .ck-composer__error {
+    margin: 0;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.85em;
+    color: #b42318;
+    background: #fef3f2;
+    border: 1px solid #fecdca;
+    border-radius: 6px;
   }
 
   .ck-composer__attachments {

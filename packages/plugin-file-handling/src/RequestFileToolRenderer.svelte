@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getChatContext } from '@chatkit-svelte/svelte';
+  import { formatBytes, inferMimeType, matchesAccept } from '@chatkit-svelte/core';
   import type { ContentPart } from '@chatkit-svelte/core';
 
   interface Props {
@@ -25,16 +26,16 @@
 
   let error = $state('');
 
-  function matchesAccept(mimeType: string, patterns: string[]): boolean {
-    return patterns.some((pattern) => (pattern.endsWith('/*') ? mimeType.startsWith(pattern.slice(0, -1)) : mimeType === pattern));
-  }
-
   async function handleFileChange(event: Event) {
     error = '';
     const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
+    const picked = input.files?.[0];
     input.value = '';
-    if (!file) return;
+    if (!picked) return;
+
+    // Same as the composer: the OS's idea of a file's type is often empty or wrong, so go by the extension then.
+    const type = inferMimeType(picked);
+    const file = type === picked.type ? picked : new File([picked], picked.name, { type, lastModified: picked.lastModified });
 
     if (args.accept && !matchesAccept(file.type, args.accept)) {
       error = store.t('fileRequest.unsupportedType');
@@ -46,16 +47,20 @@
       return;
     }
     if (handler.maxSizeBytes && file.size > handler.maxSizeBytes) {
-      error = store.t('fileRequest.tooLarge');
+      error = `${store.t('fileRequest.tooLarge')} (${formatBytes(handler.maxSizeBytes)})`;
       return;
     }
 
-    const part = await handler.process(file, {});
-    // Same mechanism ShowFormToolRenderer uses: update this tool call's args
-    // to the real answer (here, the uploaded file's ContentPart) and let the
-    // onToolCall hook echo it back as the tool's result, resuming the
-    // paused run with a reference to the file the agent asked for.
-    await store.editAndRetry(toolCall.toolCallId, part);
+    try {
+      const part = await handler.process(file, {});
+      // Same mechanism ShowFormToolRenderer uses: update this tool call's args
+      // to the real answer (here, the uploaded file's ContentPart) and let the
+      // onToolCall hook echo it back as the tool's result, resuming the
+      // paused run with a reference to the file the agent asked for.
+      await store.editAndRetry(toolCall.toolCallId, part);
+    } catch {
+      error = store.t('fileRequest.failed');
+    }
   }
 </script>
 

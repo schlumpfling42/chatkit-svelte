@@ -77,6 +77,46 @@ describe('RequestFileToolRenderer', () => {
     expect(transport.recorder.toolResults).toHaveLength(0);
   });
 
+  it('accepts a .json file by default and sends it back with its type', async () => {
+    const transport = createFixtureTransport(toolCallEvents({}));
+    const upload = vi.fn(async () => ({ url: 'data:application/json;base64,e30=' }));
+    render(TestHarness, { config: { transport, threadId: 't1', plugins: [fileHandlingPlugin({ upload })] }, toolCallId: 'tc1' });
+
+    const fileInput = await screen.findByLabelText('Attach file');
+    await fireEvent.change(fileInput, { target: { files: [new File(['{}'], 'config.json', { type: 'application/json' })] } });
+
+    await waitFor(() => expect(transport.recorder.toolResults).toHaveLength(1));
+    expect(transport.recorder.toolResults[0].result).toMatchObject({ type: 'file', name: 'config.json', mimeType: 'application/json' });
+  });
+
+  it('goes by the extension when the OS reports no type, so a .md file is not refused', async () => {
+    const transport = createFixtureTransport(toolCallEvents({}));
+    const upload = vi.fn(async (file: File) => ({ url: `data:${file.type};base64,IyBoaQ==` }));
+    render(TestHarness, { config: { transport, threadId: 't1', plugins: [fileHandlingPlugin({ upload })] }, toolCallId: 'tc1' });
+
+    const fileInput = await screen.findByLabelText('Attach file');
+    await fireEvent.change(fileInput, { target: { files: [new File(['# hi'], 'notes.md', { type: '' })] } });
+
+    await waitFor(() => expect(transport.recorder.toolResults).toHaveLength(1));
+    expect(transport.recorder.toolResults[0].result).toMatchObject({ name: 'notes.md', mimeType: 'text/markdown' });
+    expect(screen.queryByTestId('request-file-error')).not.toBeInTheDocument();
+  });
+
+  it('says so when the upload itself fails, and leaves the request open to try again', async () => {
+    const transport = createFixtureTransport(toolCallEvents({}));
+    const upload = vi.fn(async () => {
+      throw new Error('network down');
+    });
+    render(TestHarness, { config: { transport, threadId: 't1', plugins: [fileHandlingPlugin({ upload })] }, toolCallId: 'tc1' });
+
+    const fileInput = await screen.findByLabelText('Attach file');
+    await fireEvent.change(fileInput, { target: { files: [new File(['x'], 'a.txt', { type: 'text/plain' })] } });
+
+    await waitFor(() => expect(screen.getByTestId('request-file-error')).toHaveTextContent('couldn’t be uploaded'));
+    expect(transport.recorder.toolResults).toHaveLength(0);
+    expect(screen.getByLabelText('Attach file')).toBeInTheDocument();
+  });
+
   it('rejects a file with no matching attachmentHandler registered at all', async () => {
     const transport = createFixtureTransport(toolCallEvents({}));
     const upload = vi.fn(async () => ({ url: 'https://x/y' }));

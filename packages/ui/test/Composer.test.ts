@@ -52,21 +52,101 @@ describe('Composer — attachments', () => {
     ]);
   });
 
-  it('a file with no matching handler is silently ignored', async () => {
+  function setup(handler: { accept: string[]; maxSizeBytes?: number; process: ReturnType<typeof vi.fn> }) {
     const transport = createFixtureTransport([]);
-    const process = vi.fn();
-    const plugin: ChatPlugin = {
-      name: 'attach-test',
-      version: '1.0.0',
-      attachmentHandlers: [{ accept: ['image/*'], process }],
-    };
+    const plugin: ChatPlugin = { name: 'attach-test', version: '1.0.0', attachmentHandlers: [handler as never] };
     render(ComposerHarness, { config: { transport, threadId: 't1', plugins: [plugin] } });
+    return screen.getByLabelText('Attach file', { selector: 'input' }) as HTMLInputElement;
+  }
 
-    const fileInput = screen.getByLabelText('Attach file', { selector: 'input' }) as HTMLInputElement;
-    const file = new File(['hello'], 'y.txt', { type: 'text/plain' });
-    await fireEvent.change(fileInput, { target: { files: [file] } });
+  const partFor = (name: string, mimeType: string) => vi.fn(async () => ({ type: 'file' as const, url: 'data:x', name, mimeType }));
+
+  it('a file no handler accepts is refused with a visible explanation, never silently', async () => {
+    const process = vi.fn();
+    const fileInput = setup({ accept: ['image/*', 'application/pdf'], process });
+
+    await fireEvent.change(fileInput, { target: { files: [new File(['x'], 'report.docx', { type: 'application/msword' })] } });
 
     expect(process).not.toHaveBeenCalled();
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('report.docx');
+    expect(alert).toHaveTextContent('image/*, application/pdf');
+  });
+
+  it('a file over the size limit is refused with a visible explanation', async () => {
+    const process = vi.fn();
+    const fileInput = setup({ accept: ['text/*'], maxSizeBytes: 10, process });
+
+    await fireEvent.change(fileInput, { target: { files: [new File(['this is longer than ten bytes'], 'big.txt', { type: 'text/plain' })] } });
+
+    expect(process).not.toHaveBeenCalled();
+    expect(await screen.findByRole('alert')).toHaveTextContent('“big.txt” is too large (the limit is 10 bytes)');
+  });
+
+  it('a handler that throws (say, the upload failed) is reported, not swallowed', async () => {
+    const process = vi.fn(async () => {
+      throw new Error('network down');
+    });
+    const fileInput = setup({ accept: ['text/*'], process });
+
+    await fireEvent.change(fileInput, { target: { files: [new File(['x'], 'a.txt', { type: 'text/plain' })] } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('“a.txt” couldn’t be attached');
+    expect(screen.queryByText('a.txt')).not.toBeInTheDocument();
+  });
+
+  it('the explanation goes away once a later file attaches fine', async () => {
+    const process = partFor('ok.txt', 'text/plain');
+    const fileInput = setup({ accept: ['text/*'], process });
+
+    await fireEvent.change(fileInput, { target: { files: [new File(['x'], 'nope.docx', { type: 'application/msword' })] } });
+    await screen.findByRole('alert');
+    await fireEvent.change(fileInput, { target: { files: [new File(['x'], 'ok.txt', { type: 'text/plain' })] } });
+
+    await waitFor(() => expect(screen.getByText('ok.txt')).toBeInTheDocument());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('a .json file is accepted where the handler lists application/json (the type that used to be dropped)', async () => {
+    const process = partFor('config.json', 'application/json');
+    const fileInput = setup({ accept: ['text/*', 'application/json'], process });
+
+    await fireEvent.change(fileInput, { target: { files: [new File(['{"a":1}'], 'config.json', { type: 'application/json' })] } });
+
+    await waitFor(() => expect(screen.getByText('config.json')).toBeInTheDocument());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('goes by the extension when the OS reports no type (.md on Windows) and hands the handler a file with the inferred type', async () => {
+    const process = partFor('notes.md', 'text/markdown');
+    const fileInput = setup({ accept: ['text/*'], process });
+
+    await fireEvent.change(fileInput, { target: { files: [new File(['# hi'], 'notes.md', { type: '' })] } });
+
+    await waitFor(() => expect(process).toHaveBeenCalledTimes(1));
+    const handed = (process.mock.calls[0] as unknown as [File])[0];
+    expect(handed.name).toBe('notes.md');
+    expect(handed.type).toBe('text/markdown');
+    expect(await screen.findByText('notes.md')).toBeInTheDocument();
+  });
+
+  it('treats a .csv that Excel claimed (application/vnd.ms-excel) as CSV', async () => {
+    const process = partFor('data.csv', 'text/csv');
+    const fileInput = setup({ accept: ['text/*'], process });
+
+    await fireEvent.change(fileInput, { target: { files: [new File(['a,b'], 'data.csv', { type: 'application/vnd.ms-excel' })] } });
+
+    await waitFor(() => expect(process).toHaveBeenCalledTimes(1));
+    expect(((process.mock.calls[0] as unknown as [File])[0]).type).toBe('text/csv');
+  });
+
+  it('a handler accepting */* takes any file', async () => {
+    const process = partFor('archive.zip', 'application/zip');
+    const fileInput = setup({ accept: ['*/*'], process });
+
+    await fireEvent.change(fileInput, { target: { files: [new File(['x'], 'archive.zip', { type: 'application/zip' })] } });
+
+    await waitFor(() => expect(screen.getByText('archive.zip')).toBeInTheDocument());
   });
 
   it('shows a pending-attachment chip with the filename as soon as a file is picked, before sending', async () => {

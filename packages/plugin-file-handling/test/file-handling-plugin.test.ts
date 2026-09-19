@@ -1,16 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fileHandlingPlugin } from '../src/file-handling-plugin';
+import { DEFAULT_ACCEPT, fileHandlingPlugin } from '../src/file-handling-plugin';
 
 function makeFile(name: string, type: string, sizeBytes: number): File {
   return new File([new Uint8Array(sizeBytes)], name, { type });
 }
 
 describe('fileHandlingPlugin', () => {
-  it('registers an attachmentHandler accepting images/pdf/text by default', () => {
+  it('registers an attachmentHandler accepting images, pdf, text and text-like formats by default', () => {
     const upload = vi.fn(async () => ({ url: 'https://example.com/f' }));
     const plugin = fileHandlingPlugin({ upload });
     expect(plugin.attachmentHandlers).toHaveLength(1);
-    expect(plugin.attachmentHandlers?.[0].accept).toEqual(['image/*', 'application/pdf', 'text/*']);
+    expect(plugin.attachmentHandlers?.[0].accept).toEqual(DEFAULT_ACCEPT);
+    // JSON is application/json, not text/*: leaving it out is how a plain .json file used to be dropped silently.
+    for (const type of ['image/*', 'application/pdf', 'text/*', 'application/json', 'application/xml', 'application/yaml']) {
+      expect(DEFAULT_ACCEPT).toContain(type);
+    }
   });
 
   it('produces an image ContentPart for an image file', async () => {

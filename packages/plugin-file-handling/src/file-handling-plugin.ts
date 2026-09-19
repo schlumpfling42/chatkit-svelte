@@ -4,7 +4,7 @@ import RequestFileToolRenderer from './RequestFileToolRenderer.svelte';
 import type { ChatPlugin, ContentPart, ToolDefinition } from '@chatkit-svelte/core';
 
 export interface FileHandlingOptions {
-  /** MIME type patterns accepted, e.g. 'image/*' or 'application/pdf'. Default: images, PDFs, text files. */
+  /** MIME type patterns accepted, e.g. 'image/*' or 'application/pdf'; '*' + '/*' accepts anything. Default: DEFAULT_ACCEPT (images, PDFs, text and text-like formats such as JSON). */
   accept?: string[];
   /** Max file size in bytes. Default 25MB. */
   maxSizeBytes?: number;
@@ -42,13 +42,31 @@ export const requestFileToolDefinition: ToolDefinition = {
   executesOn: 'frontend',
 };
 
+/**
+ * What the composer accepts unless the app says otherwise: images, PDFs, and the text-like formats people
+ * actually attach (JSON, XML, YAML, CSV, scripts). Note that "text-like" is more than text/*: JSON is
+ * application/json, and refusing it was how a plain .json file used to be dropped.
+ */
+export const DEFAULT_ACCEPT = [
+  'image/*',
+  'application/pdf',
+  'text/*',
+  'application/json',
+  'application/xml',
+  'application/yaml',
+  'application/x-yaml',
+  'application/csv',
+  'application/javascript',
+  'application/x-sh',
+];
+
 export function fileHandlingPlugin(opts: FileHandlingOptions): ChatPlugin {
   return {
     name: 'file-handling',
     version: '1.0.0',
     attachmentHandlers: [
       {
-        accept: opts.accept ?? ['image/*', 'application/pdf', 'text/*'],
+        accept: opts.accept ?? DEFAULT_ACCEPT,
         maxSizeBytes: opts.maxSizeBytes ?? 25 * 1024 * 1024,
         async process(file, ctx): Promise<ContentPart> {
           // AttachmentHandler.process's `file` parameter is typed structurally
