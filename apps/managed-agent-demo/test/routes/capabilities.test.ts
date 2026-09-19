@@ -7,7 +7,7 @@ describe('GET /api/agent/capabilities', () => {
     expect(await response.json()).toEqual({
       transports: ['sse'],
       tools: [],
-      multimodal: false,
+      multimodal: true,
       reasoning: true,
       humanInTheLoop: false,
       sharedStateWritable: false,

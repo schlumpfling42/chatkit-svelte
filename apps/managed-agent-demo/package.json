@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "license": "MIT",
   "private": true,
-  "description": "Live demo: @chatkit-svelte/transport-agui driving a hosted Claude Managed Agent.",
+  "description": "Live demo: @chatkit-svelte/transport-agui driving any OpenAI-compatible model server (FastFlowLM by default).",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
@@ -22,9 +22,7 @@
     "@chatkit-svelte/plugin-file-handling": "workspace:*",
     "@chatkit-svelte/plugin-forms": "workspace:*",
     "@chatkit-svelte/plugin-documents": "workspace:*",
-    "@chatkit-svelte/plugin-devtools": "workspace:*",
-    "@ag-ui/claude-managed-agents": "^0.0.1",
-    "@anthropic-ai/sdk": "^0.109.0"
+    "@chatkit-svelte/plugin-devtools": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.0.0",

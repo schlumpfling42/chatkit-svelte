@@ -1,69 +1,45 @@
-import { ManagedAgentsAgent } from '@ag-ui/claude-managed-agents';
-import type { SessionRecord, SessionStore } from '@ag-ui/claude-managed-agents';
-import Anthropic, { toFile } from '@anthropic-ai/sdk';
 import { randomUUID } from 'node:crypto';
 import { applyPatch } from '@chatkit-svelte/core';
-import type { ChatEvent, ContentPart, RunAgentInput } from '@chatkit-svelte/core';
-import { getManagedAgentEnv } from './env';
-import { fromAguiEvent, toAguiMessages } from './agui-translate';
-
-interface Subscription {
-  unsubscribe: () => void;
-}
+import type { ChatEvent, RunAgentInput, ToolDefinition } from '@chatkit-svelte/core';
+import { getLlmConfig } from './env';
+import type { LlmConfig } from './env';
+import { streamChatCompletion } from './openai-stream';
+import { historyFromMessages, toOpenAiTools, toolResultContent, userMessageToOpenAi } from './openai-messages';
+import type { OpenAiMessage, OpenAiToolCall } from './openai-messages';
+import { parseToolArguments } from './tool-args';
 
 /**
- * `@ag-ui/claude-managed-agents` looks up/stores its thread↔session mapping
- * under an opaque, undocumented-format key -- by design (see its own
- * `SessionStore` doc comment: "treat it as a string to store under, not as
- * a thread id to parse"). Since agent-sessions.ts already constructs one
- * `ManagedAgentsAgent` per thread (see getOrCreateSession below), each
- * instance's store only ever needs to hold that one thread's single record,
- * so it never needs to understand the key at all -- just remember whatever
- * was last set, and let a pre-seeded record short-circuit the adapter's own
- * session creation. That's what makes the single-turn attachment flow in
- * startRun() below possible: pre-create the real session with files already
- * attached as resources, seed this store with it, then let the adapter's
- * next getOrCreateSession() call find it already there.
+ * This module is the only place that knows which AI backend is behind the
+ * app: any OpenAI-compatible `/chat/completions` server (FastFlowLM by
+ * default -- see env.ts). Everything upstream of it (the /api/agent routes,
+ * transport-agui, every plugin) only ever sees chatkit ChatEvents, which is
+ * what keeps the backend swappable.
+ *
+ * The server owns each thread's model-facing history. The client's message
+ * list is only used for what's new (the latest user message) and to rebuild
+ * history after a dev-server restart.
  */
-class SingleRecordSessionStore implements SessionStore {
-  private record: SessionRecord | undefined;
-  get(): SessionRecord | undefined {
-    return this.record;
-  }
-  set(_key: string, record: SessionRecord): void {
-    this.record = record;
-  }
-  delete(): void {
-    this.record = undefined;
-  }
-  seed(record: SessionRecord): void {
-    this.record = record;
-  }
-}
+
+const MAX_TOOL_ARGUMENT_RETRIES = 3;
 
 interface ThreadSession {
-  agent: ManagedAgentsAgent;
-  sessionStore: SingleRecordSessionStore;
   events: ChatEvent[];
   currentState: unknown;
   activeRunId: string | null;
-  activeSubscription: Subscription | null;
+  abort: AbortController | null;
   waiters: Array<() => void>;
-  /**
-   * The real Anthropic session id. Either learned from the
-   * `managed_agents.session` CUSTOM event the adapter emits once it creates
-   * a session itself, or set directly by startRun() when it pre-creates one
-   * for a first message that carries an attachment.
-   */
-  realSessionId: string | null;
+  /** Model-facing conversation, excluding the system prompt (added per request). */
+  history: OpenAiMessage[];
+  seenUserMessageIds: Set<string>;
+  /** Client tools the frontend offered on its latest run. */
+  tools: Map<string, ToolDefinition>;
+  /** Tool calls emitted to the client that haven't been answered yet. */
+  pendingToolCalls: Set<string>;
+  /** Whichever turn is in flight (or most recently was); a new turn waits on it. */
+  pendingTurn: Promise<void> | null;
 }
 
 const sessions = new Map<string, ThreadSession>();
-
-// Shared with the ManagedAgentsAgent instances below, so uploads/session
-// creation/resource mounts done directly (bypassing the adapter for what it
-// doesn't expose) hit the same account/session space it uses internally.
-const anthropicClient = new Anthropic();
 
 function notifyWaiters(session: ThreadSession): void {
   const waiters = session.waiters;
@@ -76,15 +52,8 @@ function appendEvent(session: ThreadSession, event: ChatEvent): void {
   if (event.type === 'STATE_SNAPSHOT') {
     session.currentState = event.snapshot;
   } else if (event.type === 'STATE_DELTA') {
-    // Mirrors transport-agui's own emitWithStateGuard self-heal pattern: on
-    // a patch that fails to apply, leave currentState as the last known-good
-    // snapshot rather than corrupt it. Unlike the client-side version, there
-    // is no server to fetch a fresh snapshot from here, so this is as far as
-    // the self-heal can go.
     const { result, ok } = applyPatch(session.currentState, event.patch);
-    if (ok) {
-      session.currentState = result;
-    }
+    if (ok) session.currentState = result;
   }
   notifyWaiters(session);
 }
@@ -93,248 +62,293 @@ function appendRunError(session: ThreadSession, runId: string, code: string, err
   appendEvent(session, {
     type: 'RUN_ERROR',
     runId,
-    error: {
-      code,
-      message: err instanceof Error ? err.message : String(err),
-      recoverable,
-      raw: err,
-    },
+    error: { code, message: err instanceof Error ? err.message : String(err), recoverable, raw: err },
   });
-}
-
-/**
- * Clears the active-run bookkeeping only if it still belongs to `runId`.
- * A run's `error`/`complete` callback can fire after a newer run has
- * already replaced it (e.g. a slow teardown racing a fresh `startRun` call)
- * — without this guard, the stale callback would clobber the newer run's
- * `activeRunId`/`activeSubscription`.
- */
-function clearActiveRunIfCurrent(session: ThreadSession, runId: string): void {
-  if (session.activeRunId !== runId) return;
-  session.activeRunId = null;
-  session.activeSubscription = null;
 }
 
 export function getOrCreateSession(threadId: string): ThreadSession {
   let session = sessions.get(threadId);
   if (!session) {
-    const env = getManagedAgentEnv();
-    const sessionStore = new SingleRecordSessionStore();
     session = {
-      agent: new ManagedAgentsAgent({ managedAgentId: env.agentId, environmentId: env.environmentId, client: anthropicClient, sessionStore }),
-      sessionStore,
       events: [],
       currentState: undefined,
       activeRunId: null,
-      activeSubscription: null,
+      abort: null,
       waiters: [],
-      realSessionId: null,
+      history: [],
+      seenUserMessageIds: new Set(),
+      tools: new Map(),
+      pendingToolCalls: new Set(),
+      pendingTurn: null,
     };
     sessions.set(threadId, session);
   }
   return session;
 }
 
-/**
- * Runs one real turn against the agent and reports its events. Pure
- * turn-taking only -- attachment handling (uploading, mounting, and
- * rewriting the outgoing message) happens in startRun below, before this is
- * ever called. Resolves once the turn finishes (error or complete).
- */
-function runTurn(session: ThreadSession, input: RunAgentInput): Promise<void> {
-  return new Promise((resolveTurn) => {
-    // A thread can only have one active run at a time: starting a new one
-    // replaces whatever was already in flight rather than running alongside it.
-    if (session.activeSubscription) {
-      session.activeSubscription.unsubscribe();
+function answerPendingToolCallsAsUnanswered(session: ThreadSession): void {
+  // The user moved on (typed a message) instead of answering. The API
+  // requires every tool call be followed by a result, so close them out.
+  for (const toolCallId of session.pendingToolCalls) {
+    session.history.push({ role: 'tool', tool_call_id: toolCallId, content: 'The user did not respond to this request.' });
+  }
+  session.pendingToolCalls.clear();
+}
+
+function syncHistory(session: ThreadSession, input: RunAgentInput): void {
+  session.tools = new Map(input.tools.map((tool) => [tool.name, tool]));
+  answerPendingToolCallsAsUnanswered(session);
+  if (session.history.length === 0) {
+    session.history = historyFromMessages(input.messages);
+    for (const message of input.messages) if (message.role === 'user') session.seenUserMessageIds.add(message.id);
+    return;
+  }
+  for (const message of input.messages) {
+    if (message.role !== 'user' || session.seenUserMessageIds.has(message.id)) continue;
+    session.seenUserMessageIds.add(message.id);
+    session.history.push(userMessageToOpenAi(message));
+  }
+}
+
+type ToolCallOutcome =
+  | { call: { id: string; name: string; arguments: string }; index: number; error: string }
+  | { call: { id: string; name: string; arguments: string }; index: number; error?: undefined; value: Record<string, unknown>; repaired: boolean };
+
+interface RoundState {
+  messageId: string | null;
+  text: string;
+  toolCalls: Array<{ id: string; name: string; arguments: string }>;
+  finishReason: string | null;
+}
+
+/** One model request, streamed straight through as chat events. Fills `round` as it goes so an abort still leaves what was said. */
+async function streamRound(session: ThreadSession, config: LlmConfig, round: RoundState, signal: AbortSignal): Promise<void> {
+  const tools = toOpenAiTools([...session.tools.values()]);
+  const body: Record<string, unknown> = {
+    model: config.model,
+    messages: [{ role: 'system', content: config.systemPrompt }, ...session.history],
+    stream: true,
+    ...(tools.length > 0 ? { tools } : {}),
+  };
+
+  let reasoningId: string | null = null;
+  let leadingWhitespace = '';
+
+  const endReasoning = () => {
+    if (reasoningId) {
+      appendEvent(session, { type: 'REASONING_END', messageId: reasoningId });
+      reasoningId = null;
     }
-    session.activeRunId = input.runId;
-    session.activeSubscription = null;
-    // `ManagedAgentsAgent.run()` takes @ag-ui/client's own `RunAgentInput` (a
-    // different, wire-level message/tool shape than @chatkit-svelte/core's
-    // `RunAgentInput`) and emits @ag-ui/client's `BaseEvent` union (a superset
-    // of @chatkit-svelte/core's `ChatEvent`, with several same-named fields
-    // renamed and a handful of event types ChatEvent doesn't have at all).
-    // `toAguiMessages`/`fromAguiEvent` (see agui-translate.ts) do the real
-    // field-level translation. `messages` is converted below; `tools`
-    // type-checks as-is (both sides use a compatible flat {name, description,
-    // parameters} shape). `context` is dropped rather than translated: chatkit
-    // types it as `Record<string, unknown>` but AG-UI expects
-    // `{value, description}[]`, and nothing in this codebase populates or
-    // reads it today, so there's no real shape to translate — inventing one
-    // would just be guessing. AG-UI's `context` field is required (not
-    // optional), so we pass an empty array rather than omitting the key.
-    const { context: _unusedContext, ...rest } = input;
-    const agentInput = { ...rest, messages: toAguiMessages(input.messages), context: [] };
+  };
+
+  for await (const event of streamChatCompletion({ baseUrl: config.baseUrl, apiKey: config.apiKey, body, signal })) {
+    if (event.type === 'reasoning') {
+      if (!reasoningId) {
+        reasoningId = randomUUID();
+        appendEvent(session, { type: 'REASONING_START', messageId: reasoningId });
+      }
+      appendEvent(session, { type: 'REASONING_CONTENT', messageId: reasoningId, delta: event.delta });
+    } else if (event.type === 'text') {
+      // Hold back leading whitespace until real text shows up: a model that
+      // emits "\n" before a tool call shouldn't leave an empty message bubble.
+      if (!round.messageId && event.delta.trim() === '') {
+        leadingWhitespace += event.delta;
+        continue;
+      }
+      endReasoning();
+      let delta = event.delta;
+      if (!round.messageId) {
+        round.messageId = randomUUID();
+        appendEvent(session, { type: 'TEXT_MESSAGE_START', messageId: round.messageId, role: 'assistant' });
+        delta = leadingWhitespace + delta;
+        leadingWhitespace = '';
+      }
+      round.text += delta;
+      appendEvent(session, { type: 'TEXT_MESSAGE_CONTENT', messageId: round.messageId, delta });
+    } else if (event.type === 'tool_calls') {
+      round.toolCalls = event.calls;
+    } else {
+      round.finishReason = event.reason;
+    }
+  }
+  endReasoning();
+  if (round.messageId) appendEvent(session, { type: 'TEXT_MESSAGE_END', messageId: round.messageId });
+}
+
+function closeOpenMessageOnAbort(session: ThreadSession, round: RoundState): void {
+  if (round.messageId) appendEvent(session, { type: 'TEXT_MESSAGE_END', messageId: round.messageId });
+  if (round.text) session.history.push({ role: 'assistant', content: round.text });
+}
+
+async function executeRun(session: ThreadSession, threadId: string, runId: string, signal: AbortSignal): Promise<void> {
+  appendEvent(session, { type: 'RUN_STARTED', runId, threadId });
+  let config: LlmConfig;
+  try {
+    config = getLlmConfig();
+  } catch (err) {
+    appendRunError(session, runId, 'llm_not_configured', err);
+    return;
+  }
+
+  let argumentRetries = 0;
+  for (;;) {
+    const round: RoundState = { messageId: null, text: '', toolCalls: [], finishReason: null };
     try {
-      session.activeSubscription = session.agent.run(agentInput).subscribe({
-        next: (event) => {
-          const raw = event as { type: string; name?: string; value?: { sessionId?: string } };
-          // Learn the real Anthropic session id as soon as the adapter
-          // creates one itself (the no-attachment path never pre-creates
-          // one, so this is still how that path learns it).
-          if (raw.type === 'CUSTOM' && raw.name === 'managed_agents.session' && raw.value?.sessionId) {
-            session.realSessionId = raw.value.sessionId;
-          }
-          appendEvent(session, fromAguiEvent(raw, input.runId));
-        },
-        error: (err: unknown) => {
-          appendRunError(session, input.runId, 'managed_agent_error', err);
-          clearActiveRunIfCurrent(session, input.runId);
-          resolveTurn();
-        },
-        complete: () => {
-          clearActiveRunIfCurrent(session, input.runId);
-          resolveTurn();
-        },
-      });
+      await streamRound(session, config, round, signal);
     } catch (err) {
-      // `.run()` itself threw synchronously (before returning an Observable to
-      // subscribe to) — there is no subscription to hold, so don't leave the
-      // session stuck thinking a run is still active.
-      clearActiveRunIfCurrent(session, input.runId);
-      appendRunError(session, input.runId, 'managed_agent_error', err);
-      resolveTurn();
+      if (signal.aborted) {
+        closeOpenMessageOnAbort(session, round);
+        return;
+      }
+      appendRunError(session, runId, 'llm_request_failed', err);
+      return;
     }
-  });
-}
+    if (signal.aborted) {
+      closeOpenMessageOnAbort(session, round);
+      return;
+    }
 
-interface Attachment {
-  kind: 'image' | 'file';
-  url: string;
-  mimeType: string;
-  name?: string;
-}
+    if (round.toolCalls.length === 0) {
+      if (round.text) session.history.push({ role: 'assistant', content: round.text });
+      appendEvent(session, { type: 'RUN_FINISHED', runId });
+      return;
+    }
 
-function extractAttachments(parts: ContentPart[]): Attachment[] {
-  const result: Attachment[] = [];
-  for (const part of parts) {
-    if (part.type === 'image') result.push({ kind: 'image', url: part.url, mimeType: part.mimeType });
-    else if (part.type === 'file') result.push({ kind: 'file', url: part.url, mimeType: part.mimeType, name: part.name });
+    const assistantToolCalls: OpenAiToolCall[] = round.toolCalls.map((call) => ({
+      id: call.id,
+      type: 'function',
+      function: { name: call.name, arguments: call.arguments },
+    }));
+    session.history.push({ role: 'assistant', content: round.text || null, tool_calls: assistantToolCalls });
+
+    const truncated = round.finishReason === 'length';
+    const outcomes: ToolCallOutcome[] = round.toolCalls.map((call, index): ToolCallOutcome => {
+      if (!session.tools.has(call.name)) {
+        return { call, index, error: `Unknown tool "${call.name}". Available tools: ${[...session.tools.keys()].join(', ') || 'none'}.` };
+      }
+      if (truncated) return { call, index, error: 'Your output was cut off before the tool call finished. Call it again with shorter arguments.' };
+      const parsed = parseToolArguments(call.arguments);
+      if (!parsed.ok) return { call, index, error: `${parsed.error} Call it again with valid JSON arguments (escape quotes and newlines inside strings).` };
+      return { call, index, value: parsed.value, repaired: parsed.repaired };
+    });
+
+    if (outcomes.some((o) => o.error !== undefined)) {
+      // Nothing broken reaches the UI. Every call still needs an answer, so
+      // each gets a tool result and the model gets another try.
+      for (const outcome of outcomes) {
+        session.history.push({
+          role: 'tool',
+          tool_call_id: outcome.call.id,
+          content: outcome.error ?? 'Not run: another tool call in the same response was invalid. Call it again.',
+        });
+      }
+      appendEvent(session, {
+        type: 'CUSTOM',
+        name: 'llm.tool_call_rejected',
+        payload: { calls: outcomes.map((o) => ({ name: o.call.name, arguments: o.call.arguments, error: o.error })) },
+      });
+      argumentRetries += 1;
+      if (argumentRetries > MAX_TOOL_ARGUMENT_RETRIES) {
+        appendRunError(session, runId, 'tool_arguments_invalid', new Error('The model kept producing invalid tool-call arguments.'), true);
+        return;
+      }
+      continue;
+    }
+
+    // All valid: canonicalize the stored arguments (so repaired JSON never
+    // poisons later requests) and hand the calls to the client.
+    let parentMessageId = round.messageId;
+    if (!parentMessageId) {
+      // A tool call as the model's first action has no message to hang on.
+      parentMessageId = randomUUID();
+      appendEvent(session, { type: 'TEXT_MESSAGE_START', messageId: parentMessageId, role: 'assistant' });
+      appendEvent(session, { type: 'TEXT_MESSAGE_END', messageId: parentMessageId });
+    }
+    for (const outcome of outcomes) {
+      if (outcome.error !== undefined) continue;
+      const args = JSON.stringify(outcome.value);
+      assistantToolCalls[outcome.index].function.arguments = args;
+      if (outcome.repaired) {
+        appendEvent(session, {
+          type: 'CUSTOM',
+          name: 'llm.tool_arguments_repaired',
+          payload: { toolCallId: outcome.call.id, toolName: outcome.call.name, raw: outcome.call.arguments },
+        });
+      }
+      appendEvent(session, { type: 'TOOL_CALL_START', toolCallId: outcome.call.id, toolName: outcome.call.name, parentMessageId });
+      appendEvent(session, { type: 'TOOL_CALL_ARGS', toolCallId: outcome.call.id, delta: args });
+      appendEvent(session, { type: 'TOOL_CALL_END', toolCallId: outcome.call.id });
+      session.pendingToolCalls.add(outcome.call.id);
+    }
+    // Parked: the run ends here and resumes when the last answer arrives (sendToolResult).
+    appendEvent(session, { type: 'RUN_FINISHED', runId });
+    return;
   }
-  return result;
 }
 
-const DATA_URI = /^data:([^;,]+)(?:;charset=[^;,]+)?;base64,(.+)$/s;
+function startTurn(session: ThreadSession, threadId: string, runId: string, prepare?: () => void): Promise<void> {
+  const previous = session.pendingTurn;
+  const turn = (async () => {
+    // Starting a run replaces whatever is in flight: cancel it and wait for
+    // it to actually unwind, so two turns never write history concurrently.
+    if (session.abort) session.abort.abort();
+    if (previous) await previous;
 
-function attachmentFilename(attachment: Attachment): string {
-  const extension = attachment.mimeType.includes('/') ? `.${attachment.mimeType.split('/')[1]}` : '';
-  return attachment.name ?? `${attachment.kind}${extension}`;
-}
-
-/** Uploads one attachment's bytes via the Files API. Throws if `url` isn't a
- * data: URI -- only files this app's own upload() produced can be handled,
- * since there's no other source of raw bytes to upload here. */
-async function uploadAttachment(attachment: Attachment): Promise<string> {
-  const match = DATA_URI.exec(attachment.url);
-  if (!match) {
-    throw new Error(`Attachment "${attachment.name ?? attachment.kind}" is not a data: URI -- only files this app's own upload() produced can be mounted.`);
-  }
-  const [, mimeType, base64] = match;
-  const buffer = Buffer.from(base64, 'base64');
-  const file = await toFile(buffer, attachmentFilename(attachment), { type: mimeType });
-  const uploaded = await anthropicClient.beta.files.upload({ file });
-  return uploaded.id;
-}
-
-/**
- * Uploads and mounts one attachment into a session that already exists,
- * via sessions.resources.add() -- @ag-ui/claude-managed-agents doesn't
- * expose this at all, so it's done directly against the same Anthropic
- * client the adapter itself uses. Requires `session.realSessionId`.
- */
-async function mountOnExistingSession(session: ThreadSession, attachment: Attachment): Promise<string> {
-  if (!session.realSessionId) {
-    throw new Error('No managed session exists yet to attach files to.');
-  }
-  const fileId = await uploadAttachment(attachment);
-  const resource = await anthropicClient.beta.sessions.resources.add(session.realSessionId, { file_id: fileId, type: 'file' });
-  return resource.mount_path;
-}
-
-/**
- * Uploads every attachment and pre-creates the real Anthropic session with
- * them already attached as resources, seeding the thread's SessionStore so
- * the adapter's next run() call finds this session instead of making its
- * own. This is what lets a first message with an attachment reach the agent
- * in a single turn, with the file already mounted, instead of the
- * text-only-turn-then-follow-up dance a lazily-created session would need.
- */
-async function createSessionWithAttachments(session: ThreadSession, attachments: Attachment[]): Promise<Map<Attachment, string>> {
-  const env = getManagedAgentEnv();
-  const fileIds = await Promise.all(attachments.map(uploadAttachment));
-  const created = await anthropicClient.beta.sessions.create({
-    agent: env.agentId,
-    environment_id: env.environmentId,
-    resources: fileIds.map((file_id) => ({ type: 'file' as const, file_id })),
-  });
-  session.realSessionId = created.id;
-  session.sessionStore.seed({ sessionId: created.id, toolNames: [], pendingClientToolUseIds: [] });
-
-  const mountPaths = new Map<Attachment, string>();
-  for (let i = 0; i < attachments.length; i += 1) {
-    const resource = created.resources.find((r) => r.type === 'file' && r.file_id === fileIds[i]);
-    if (resource && resource.type === 'file') mountPaths.set(attachments[i], resource.mount_path);
-  }
-  return mountPaths;
+    const controller = new AbortController();
+    session.abort = controller;
+    session.activeRunId = runId;
+    try {
+      prepare?.();
+      await executeRun(session, threadId, runId, controller.signal);
+    } catch (err) {
+      if (!controller.signal.aborted) appendRunError(session, runId, 'agent_error', err);
+    } finally {
+      if (session.activeRunId === runId) {
+        session.activeRunId = null;
+        session.abort = null;
+      }
+    }
+  })();
+  session.pendingTurn = turn;
+  return turn;
 }
 
 export function startRun(threadId: string, input: RunAgentInput): void {
   const session = getOrCreateSession(threadId);
-  const lastMessage = input.messages[input.messages.length - 1];
-  const attachments = lastMessage?.role === 'user' ? extractAttachments(lastMessage.parts) : [];
-
-  if (attachments.length === 0) {
-    void runTurn(session, input);
-    return;
-  }
-
-  void (async () => {
-    const mountNotes: string[] = [];
-    try {
-      if (session.realSessionId) {
-        // A session already exists for this thread -- mount straight into
-        // it, then send one turn. No need to pre-create anything.
-        for (const attachment of attachments) {
-          const mountPath = await mountOnExistingSession(session, attachment);
-          mountNotes.push(`${attachmentFilename(attachment)} → ${mountPath}`);
-        }
-      } else {
-        // No session yet for this thread. Creating one is normally
-        // something the adapter does lazily on the first turn -- pre-empt
-        // that so the files are already mounted before the agent ever sees
-        // this message, avoiding a separate "I don't see anything" turn.
-        const mountPaths = await createSessionWithAttachments(session, attachments);
-        for (const attachment of attachments) {
-          const mountPath = mountPaths.get(attachment);
-          if (mountPath) mountNotes.push(`${attachmentFilename(attachment)} → ${mountPath}`);
-        }
-      }
-    } catch (err) {
-      appendRunError(session, input.runId, 'attachment_mount_failed', err, true);
-    }
-
-    const strippedParts = lastMessage.parts.filter((p) => p.type !== 'image' && p.type !== 'file');
-    const noteText =
-      mountNotes.length > 0
-        ? `\n\n(System note: the attached file(s) are available in your workspace at:\n${mountNotes.join('\n')})`
-        : '';
-    const finalParts: ContentPart[] =
-      strippedParts.length > 0 || !noteText
-        ? [...strippedParts, ...(noteText ? [{ type: 'text' as const, text: noteText.trim() }] : [])]
-        : [{ type: 'text', text: noteText.trim() }];
-    const finalMessages = input.messages.map((m, i) => (i === input.messages.length - 1 ? { ...m, parts: finalParts } : m));
-
-    await runTurn(session, { ...input, messages: finalMessages });
-  })();
+  // Deferred into the turn so history is only touched once any previous turn has unwound.
+  void startTurn(session, threadId, input.runId, () => syncHistory(session, input));
 }
 
-// Known limitation: if a consumer abandons this generator while parked on
-// the `await` below (e.g. an SSE client disconnects), its resolver stays in
-// `session.waiters` forever instead of being actively cleaned up — it just
-// never gets called again. Fine for a short-lived demo process; a
-// longer-lived server would need a real cancellation path (e.g. tied to the
-// request's AbortSignal) to avoid the array growing unbounded.
+/**
+ * `ToolResult` (what transport-agui's sendFrontendToolResult POSTs to
+ * /tool-results) carries a toolCallId but no threadId -- the transport
+ * contract just doesn't include one. Scanning each thread's own event log
+ * for the TOOL_CALL_START that introduced this id is how the tool-results
+ * route recovers which thread it belongs to.
+ */
+export function findSessionByToolCallId(toolCallId: string): { threadId: string; session: ThreadSession } | undefined {
+  for (const [threadId, session] of sessions) {
+    if (session.events.some((e) => e.type === 'TOOL_CALL_START' && e.toolCallId === toolCallId)) {
+      return { threadId, session };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Delivers a client tool's result to the model, and once every tool call
+ * from that model response has been answered, resumes the conversation.
+ */
+export function sendToolResult(threadId: string, toolCallId: string, result: unknown): void {
+  const session = sessions.get(threadId);
+  if (!session || !session.pendingToolCalls.has(toolCallId)) return;
+  session.pendingToolCalls.delete(toolCallId);
+  session.history.push({ role: 'tool', tool_call_id: toolCallId, content: toolResultContent(result) });
+  if (session.pendingToolCalls.size === 0) {
+    void startTurn(session, threadId, randomUUID());
+  }
+}
+
 export async function* subscribeFromIndex(
   threadId: string,
   fromIndex: number
@@ -346,6 +360,9 @@ export async function* subscribeFromIndex(
       yield { index, event: session.events[index] };
       index += 1;
     }
+    // Known limitation: a consumer that abandons this generator while parked
+    // here (SSE client disconnect) leaves its resolver in session.waiters
+    // until the next event -- fine for a local demo process.
     await new Promise<void>((resolve) => {
       session.waiters.push(resolve);
     });
@@ -364,11 +381,7 @@ export function findSessionByRunId(runId: string): { threadId: string; session: 
 }
 
 export function abortRun(threadId: string): void {
-  const session = sessions.get(threadId);
-  if (!session) return;
-  session.activeSubscription?.unsubscribe();
-  session.activeSubscription = null;
-  session.activeRunId = null;
+  sessions.get(threadId)?.abort?.abort();
 }
 
 /** Test-only: clears all in-memory sessions between test cases. */

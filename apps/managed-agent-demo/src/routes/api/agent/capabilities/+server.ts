@@ -5,7 +5,7 @@ import type { AgentCapabilities } from '@chatkit-svelte/core';
 const capabilities: AgentCapabilities = {
   transports: ['sse'],
   tools: [],
-  multimodal: false,
+  multimodal: true,
   reasoning: true,
   humanInTheLoop: false,
   sharedStateWritable: false,
