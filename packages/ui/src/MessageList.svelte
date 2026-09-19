@@ -3,6 +3,7 @@
   import { onDestroy } from 'svelte';
   import type { Snippet, Component } from 'svelte';
   import type { ContentPart, Message } from '@chatkit-svelte/core';
+  import WorkingIndicator from './WorkingIndicator.svelte';
 
   interface Props {
     message?: Snippet<[Message]>;
@@ -55,6 +56,16 @@
   });
 
   onDestroy(() => clearTimeout(announceTimer));
+
+  // Show that the assistant is working from the moment a run starts until words are actually appearing (or the
+  // run parks on a tool, which is then the user's turn). Once assistant text is streaming, that text is the
+  // sign of life and the indicator steps aside.
+  const working = $derived.by(() => {
+    if (store.state.runStatus !== 'running') return false;
+    const last = store.messages.at(-1);
+    if (last?.role !== 'assistant' || !last.streaming) return true;
+    return !last.parts.some((p) => p.type === 'text' && p.text.trim() !== '');
+  });
 </script>
 
 <div class="ck-message-list {className ?? ''}" role="log">
@@ -83,8 +94,12 @@
       </div>
     {/if}
   {/each}
+  {#if working}
+    <WorkingIndicator />
+  {/if}
 </div>
 <div class="ck-sr-only" role="status" aria-live="polite" data-testid="live-announcer">{announcedText}</div>
+<div class="ck-sr-only" role="status" aria-live="polite" data-testid="working-announcer">{working ? store.t('working.label') : ''}</div>
 
 <style>
   .ck-message-list {

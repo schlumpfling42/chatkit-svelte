@@ -11,6 +11,10 @@ export const defaultMessages: Record<string, string> = {
   'composer.attach': 'Attach',
   'composer.removeAttachment': 'Remove attachment',
   'composer.attachmentImage': 'Image',
+  'working.label': 'The assistant is working',
+  // Pipe-separated; shown one at a time while the assistant works. Replace or translate freely.
+  'working.words':
+    'Tinkering|Contemplating|Pondering|Noodling|Cogitating|Ruminating|Percolating|Musing|Mulling it over|Brewing|Conjuring|Puzzling|Untangling|Hatching a plan|Connecting dots|Whirring',
   'composer.attachmentUnsupported': '“{name}” can’t be attached: that file type isn’t supported here. Supported: {types}.',
   'composer.attachmentTooLarge': '“{name}” is too large (the limit is {max}).',
   'composer.attachmentFailed': '“{name}” couldn’t be attached.',
