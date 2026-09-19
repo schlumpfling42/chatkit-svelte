@@ -63,6 +63,11 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    /* Without this, growing content (more messages, more devtools log
+       entries) pushes the box taller instead of scrolling inside it,
+       eventually overlapping .playground__devtools instead of sitting
+       cleanly above it. */
+    overflow: hidden;
     font-family: system-ui, sans-serif;
   }
 
@@ -91,9 +96,11 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
   .playground__devtools {
+    flex-shrink: 0;
     max-height: 16rem;
     overflow: auto;
     border-top: 1px solid #e5e5e7;

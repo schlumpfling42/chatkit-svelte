@@ -25,7 +25,8 @@
     "svelte": "^5.0.0"
   },
   "dependencies": {
-    "@chatkit-svelte/core": "workspace:*"
+    "@chatkit-svelte/core": "workspace:*",
+    "@chatkit-svelte/svelte": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/package": "^2.5.0",

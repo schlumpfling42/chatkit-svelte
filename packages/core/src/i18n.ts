@@ -18,10 +18,16 @@ export const defaultMessages: Record<string, string> = {
   'approvalBar.cancel': 'Cancel',
   'form.submit': 'Submit',
   'form.validation.required': 'This field is required.',
+  'form.score': 'Score: {correct} / {total}',
+  'form.html.submitted': 'Submitted.',
   'document.edit': 'Edit',
   'document.save': 'Save',
   'document.cancel': 'Cancel',
   'document.export': 'Export {format}',
+  'fileRequest.attach': 'Attach file',
+  'fileRequest.unsupportedType': 'That file type isn’t accepted here.',
+  'fileRequest.tooLarge': 'That file is too large.',
+  'fileRequest.pending': 'Waiting for a file…',
 };
 
 const RTL_LOCALES = new Set(['ar', 'he', 'fa', 'ur']);

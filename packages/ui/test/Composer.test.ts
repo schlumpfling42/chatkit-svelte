@@ -165,6 +165,43 @@ describe('Composer — attachments', () => {
   });
 });
 
+describe('Composer — run-in-progress guard', () => {
+  it('disables Send while a run is in progress, and does not call sendMessage if submitted anyway', async () => {
+    // The fixture transport's connect() stream fires at mount (chat-store's
+    // own bootstrap), independent of sendRun — so a RUN_STARTED with no
+    // matching RUN_FINISHED puts runStatus into 'running' and leaves it
+    // there, exactly the window a second send must be blocked in.
+    const transport = createFixtureTransport([{ type: 'RUN_STARTED', runId: 'r1', threadId: 't1' }]);
+    render(ComposerHarness, { config: { transport, threadId: 't1' } });
+
+    const sendButton = await screen.findByText('Send');
+    await waitFor(() => {
+      expect(sendButton).toBeDisabled();
+    });
+
+    const input = screen.getByLabelText('Message') as HTMLInputElement;
+    await fireEvent.input(input, { target: { value: 'should not send' } });
+    await fireEvent.submit(input.closest('form')!);
+
+    // Give any (incorrect) async sendMessage call a chance to land before asserting it didn't.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(transport.recorder.runs).toHaveLength(0);
+  });
+
+  it('re-enables Send once the run finishes', async () => {
+    const transport = createFixtureTransport([
+      { type: 'RUN_STARTED', runId: 'r1', threadId: 't1' },
+      { type: 'RUN_FINISHED', runId: 'r1' },
+    ]);
+    render(ComposerHarness, { config: { transport, threadId: 't1' } });
+
+    const sendButton = await screen.findByText('Send');
+    await waitFor(() => {
+      expect(sendButton).not.toBeDisabled();
+    });
+  });
+});
+
 describe('Composer — class prop, i18n, focus', () => {
   it('merges a passed class prop with the internal root class', () => {
     const transport = createFixtureTransport([]);

@@ -44,6 +44,27 @@ describe('createChatStore', () => {
     store.dispose();
   });
 
+  it('ignores a second sendMessage fired before the first run has started or finished', async () => {
+    // Reproduces the real-world race: two sendMessage calls issued
+    // synchronously (e.g. a double form-submit) both see runStatus still
+    // 'idle', since that only flips once a RUN_STARTED event round-trips
+    // back through the transport. Without a synchronous guard inside the
+    // store itself, both calls would reach transport.sendRun and could
+    // collide with a backend's own "one run per thread" bookkeeping.
+    const transport = createFixtureTransport([]);
+    const store = createChatStore({ transport, threadId: 't1' });
+
+    const first = store.sendMessage({ text: 'jupiter' });
+    const second = store.sendMessage({ text: 'saturn' });
+    await Promise.all([first, second]);
+
+    expect(transport.recorder.runs).toHaveLength(1);
+    expect(store.messages).toHaveLength(1);
+    expect(store.messages[0]).toMatchObject({ parts: [{ type: 'text', text: 'jupiter' }] });
+
+    store.dispose();
+  });
+
   it('dispose() disposes both the plugin host and the transport', async () => {
     const transport = createFixtureTransport([]);
     const disposeSpy = vi.spyOn(transport, 'dispose');

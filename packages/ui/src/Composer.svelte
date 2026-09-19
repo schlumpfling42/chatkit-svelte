@@ -14,6 +14,11 @@
   let inputEl: HTMLInputElement | undefined = $state();
 
   const hasAttachmentHandlers = $derived(store.registry.attachmentHandlers.length > 0);
+  // A run already in flight must finish (or error) before another can start
+  // — sending a second message into that window doesn't queue, it races the
+  // transport/backend's own single-run-per-thread bookkeeping and can come
+  // back as a hard error there instead of a friendly local no-op.
+  const isRunning = $derived(store.state.runStatus === 'running');
 
   function matchesAccept(mimeType: string, patterns: string[]): boolean {
     return patterns.some((pattern) => (pattern.endsWith('/*') ? mimeType.startsWith(pattern.slice(0, -1)) : mimeType === pattern));
@@ -37,6 +42,7 @@
 
   async function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
+    if (isRunning) return;
     const value = text.trim();
     if (!value && pendingAttachments.length === 0) return;
     const attachments = pendingAttachments;
@@ -91,7 +97,7 @@
       placeholder={store.t('composer.placeholder')}
       aria-label={store.t('composer.inputLabel')}
     />
-    <button class="ck-composer__send" type="submit">{store.t('composer.send')}</button>
+    <button class="ck-composer__send" type="submit" disabled={isRunning}>{store.t('composer.send')}</button>
   </div>
 </form>
 
@@ -192,5 +198,10 @@
     border: none;
     padding: var(--ck-space-2) var(--ck-space-3);
     cursor: pointer;
+  }
+
+  .ck-composer__send:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>

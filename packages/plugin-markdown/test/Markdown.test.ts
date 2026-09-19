@@ -41,4 +41,39 @@ describe('Markdown', () => {
     await rerender({ part: { type: 'text', text: 'Hello, **world**!' } });
     expect(screen.getByText('world').tagName).toBe('STRONG');
   });
+
+  it('renders a heading as a real h1-h6 element', () => {
+    render(Markdown, { part: { type: 'text', text: '## Section title' } });
+    const heading = screen.getByText('Section title');
+    expect(heading.tagName).toBe('H2');
+  });
+
+  it('renders a list as real ul/li elements', () => {
+    render(Markdown, { part: { type: 'text', text: '- first\n- second' } });
+    const first = screen.getByText('first');
+    expect(first.tagName).toBe('LI');
+    expect(first.closest('ul')).not.toBeNull();
+  });
+
+  it('renders an ordered list as a real ol element', () => {
+    render(Markdown, { part: { type: 'text', text: '1. first\n2. second' } });
+    expect(screen.getByText('first').closest('ol')).not.toBeNull();
+  });
+
+  it('renders a GFM table as a real table with header and data cells, not raw pipe syntax', () => {
+    render(Markdown, { part: { type: 'text', text: '| Name | Score |\n|---|---|\n| Ada | 9 |' } });
+
+    expect(screen.queryByText(/---/)).not.toBeInTheDocument();
+    const nameHeader = screen.getByText('Name');
+    expect(nameHeader.tagName).toBe('TH');
+    const adaCell = screen.getByText('Ada');
+    expect(adaCell.tagName).toBe('TD');
+    expect(adaCell.closest('table')).not.toBeNull();
+  });
+
+  it('applies column alignment from the separator row as a style', () => {
+    render(Markdown, { part: { type: 'text', text: '| A |\n|---:|\n| 1 |' } });
+    const cell = screen.getByText('1');
+    expect(cell.style.textAlign).toBe('right');
+  });
 });

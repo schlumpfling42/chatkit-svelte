@@ -5,7 +5,14 @@ export type InlineNode =
   | { type: 'code'; text: string }
   | { type: 'link'; href: string; children: InlineNode[] };
 
-export type BlockNode = { type: 'paragraph'; children: InlineNode[] } | { type: 'code'; lang?: string; text: string };
+export type TableAlign = 'left' | 'center' | 'right' | null;
+
+export type BlockNode =
+  | { type: 'paragraph'; children: InlineNode[] }
+  | { type: 'code'; lang?: string; text: string }
+  | { type: 'heading'; level: 1 | 2 | 3 | 4 | 5 | 6; children: InlineNode[] }
+  | { type: 'list'; ordered: boolean; items: InlineNode[][] }
+  | { type: 'table'; header: InlineNode[][]; align: TableAlign[]; rows: InlineNode[][][] };
 
 const INLINE_PATTERN = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\[(.+?)\]\((.+?)\))/;
 
@@ -35,6 +42,49 @@ export function parseInline(text: string): InlineNode[] {
   return nodes;
 }
 
+const HEADING_PATTERN = /^(#{1,6})\s+(.*)$/;
+const LIST_ITEM_PATTERN = /^\s*[-*+]\s+(.*)$/;
+const ORDERED_ITEM_PATTERN = /^\s*\d+\.\s+(.*)$/;
+// A GFM table separator row: one or more `---`/`:--`/`--:`/`:-:` cells,
+// pipe-delimited, with optional leading/trailing pipes. Whether a candidate
+// header row is *actually* a table hinges entirely on the NEXT line matching
+// this -- while streaming, a header row with no separator line yet just
+// falls through to an ordinary paragraph below, and re-parses as a table
+// once the separator arrives, the same "wait for confirmation" approach the
+// fenced-code-block handling already uses.
+const TABLE_SEPARATOR_PATTERN = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+
+function splitTableRow(line: string): string[] {
+  let trimmed = line.trim();
+  if (trimmed.startsWith('|')) trimmed = trimmed.slice(1);
+  if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1);
+  return trimmed.split('|').map((cell) => cell.trim());
+}
+
+function parseAlignment(cell: string): TableAlign {
+  const left = cell.startsWith(':');
+  const right = cell.endsWith(':');
+  if (left && right) return 'center';
+  if (right) return 'right';
+  if (left) return 'left';
+  return null;
+}
+
+function isTableStart(lines: string[], i: number): boolean {
+  return lines[i].includes('|') && i + 1 < lines.length && TABLE_SEPARATOR_PATTERN.test(lines[i + 1]);
+}
+
+function isBlockBoundary(lines: string[], i: number): boolean {
+  return (
+    lines[i].trim() === '' ||
+    /^```(\w*)\s*$/.test(lines[i]) ||
+    HEADING_PATTERN.test(lines[i]) ||
+    LIST_ITEM_PATTERN.test(lines[i]) ||
+    ORDERED_ITEM_PATTERN.test(lines[i]) ||
+    isTableStart(lines, i)
+  );
+}
+
 export function parseBlocks(source: string): BlockNode[] {
   const blocks: BlockNode[] = [];
   const lines = source.split('\n');
@@ -58,8 +108,43 @@ export function parseBlocks(source: string): BlockNode[] {
       i += 1;
       continue;
     }
+    const headingMatch = HEADING_PATTERN.exec(line);
+    if (headingMatch) {
+      blocks.push({
+        type: 'heading',
+        level: headingMatch[1].length as 1 | 2 | 3 | 4 | 5 | 6,
+        children: parseInline(headingMatch[2]),
+      });
+      i += 1;
+      continue;
+    }
+    if (isTableStart(lines, i)) {
+      const header = splitTableRow(line).map(parseInline);
+      const align = splitTableRow(lines[i + 1]).map(parseAlignment);
+      i += 2;
+      const rows: InlineNode[][][] = [];
+      while (i < lines.length && lines[i].trim() !== '' && lines[i].includes('|')) {
+        rows.push(splitTableRow(lines[i]).map(parseInline));
+        i += 1;
+      }
+      blocks.push({ type: 'table', header, align, rows });
+      continue;
+    }
+    if (LIST_ITEM_PATTERN.test(line) || ORDERED_ITEM_PATTERN.test(line)) {
+      const ordered = !LIST_ITEM_PATTERN.test(line);
+      const itemPattern = ordered ? ORDERED_ITEM_PATTERN : LIST_ITEM_PATTERN;
+      const items: InlineNode[][] = [];
+      while (i < lines.length) {
+        const itemMatch = itemPattern.exec(lines[i]);
+        if (!itemMatch) break;
+        items.push(parseInline(itemMatch[1]));
+        i += 1;
+      }
+      blocks.push({ type: 'list', ordered, items });
+      continue;
+    }
     const paraLines: string[] = [];
-    while (i < lines.length && lines[i].trim() !== '' && !/^```(\w*)\s*$/.test(lines[i])) {
+    while (i < lines.length && !isBlockBoundary(lines, i)) {
       paraLines.push(lines[i]);
       i += 1;
     }

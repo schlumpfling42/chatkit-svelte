@@ -12,12 +12,19 @@ const DEMO_IMAGE_SVG =
   '</svg>';
 const DEMO_IMAGE_DATA_URL = `data:image/svg+xml;base64,${btoa(DEMO_IMAGE_SVG)}`;
 
+// A minimal (silent, zero-length) WAV file — same network-independence
+// rationale as DEMO_IMAGE_DATA_URL above: enough for the audio element to
+// render real controls without depending on an external host.
+const DEMO_AUDIO_DATA_URL = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+
 export const FIXTURE_NAMES = [
   'text-streaming',
   'markdown',
   'tool-call',
   'file-handling',
   'forms',
+  'listening-quiz',
+  'html-form',
   'documents',
   'hitl-approval',
   'kitchen-sink',
@@ -103,6 +110,66 @@ export const fixtures: Record<FixtureName, ChatEvent[]> = {
           mode: 'single-submit',
           submitLabel: 'Book it',
           initialValues: { cabin: 'economy' },
+        },
+      },
+    },
+  ],
+
+  'listening-quiz': [
+    {
+      type: 'CUSTOM',
+      name: 'chatkit.form.snapshot',
+      payload: {
+        artifactId: 'quiz-1',
+        createdByMessageId: 'm1',
+        data: {
+          schema: {
+            type: 'object',
+            required: ['mainIdea'],
+            properties: {
+              mainIdea: { type: 'string', enum: ['A trip to Tokyo', 'A trip to Kyoto', 'A cooking class'], title: 'What is the clip mainly about?' },
+              placesMentioned: {
+                type: 'array',
+                items: { type: 'string', enum: ['Shibuya', 'Kyoto', 'Osaka', 'Mount Fuji'] },
+                title: 'Which places are mentioned? (pick all that apply)',
+              },
+              notes: { type: 'string', title: 'Any other notes? (not graded)' },
+            },
+          },
+          uiSchema: { widgets: { mainIdea: 'radio' } },
+          mode: 'single-submit',
+          submitLabel: 'Submit answers',
+          audio: { url: DEMO_AUDIO_DATA_URL, label: 'Listen to the clip, then answer the questions below.' },
+          answerKey: { mainIdea: 'A trip to Tokyo', placesMentioned: ['Shibuya', 'Mount Fuji'] },
+        },
+      },
+    },
+  ],
+
+  // Stands in for a self-contained document an agent generated and that got
+  // pulled back out of its session's files (see agent-sessions.ts's
+  // surfaceHtmlOutputs in apps/managed-agent-demo for the real version of
+  // that pull step). plugin-forms renders the body directly as real DOM (no
+  // iframe, no sandbox) and reads whatever's in the named fields itself on
+  // submit -- the source document doesn't need a submit button or any
+  // script of its own, and this fixture deliberately has neither, to prove
+  // that.
+  'html-form': [
+    {
+      type: 'CUSTOM',
+      name: 'chatkit.form.snapshot',
+      payload: {
+        artifactId: 'html-1',
+        createdByMessageId: 'm1',
+        data: {
+          mode: 'single-submit',
+          html: `<!doctype html>
+<html>
+<body style="font-family: system-ui, sans-serif; padding: 1rem;">
+  <h2>Trip feedback</h2>
+  <label>How was your trip?<br/><textarea name="feedback" rows="3" style="width:100%"></textarea></label>
+</body>
+</html>`,
         },
       },
     },

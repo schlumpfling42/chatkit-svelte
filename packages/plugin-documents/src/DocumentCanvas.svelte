@@ -8,9 +8,21 @@
   interface Props {
     artifact: ArtifactRecord;
     exportHandlers?: ExportHandlers;
+    /**
+     * Overrides the default save target (dispatching chatkit.document.snapshot
+     * into the store's global artifact state, which <ArtifactPanel> renders
+     * unconditionally) with a caller-supplied one. Used by
+     * plugin-documents's create_document tool renderer to keep edits local to
+     * that one tool call's own state instead of also registering an entry in
+     * the global registry — that produced a real duplicate (the same
+     * document rendered a second time at the top of the chat window, with
+     * its own independent edit state, looking like editing "jumped" to a
+     * different document).
+     */
+    onSave?: (content: string) => void;
   }
 
-  let { artifact, exportHandlers = {} }: Props = $props();
+  let { artifact, exportHandlers = {}, onSave }: Props = $props();
   const store = getChatContext();
 
   const data = $derived(artifact.data as DocumentArtifactData);
@@ -24,11 +36,15 @@
   }
 
   function saveEdit() {
-    store.dispatch({
-      type: 'CUSTOM',
-      name: 'chatkit.document.snapshot',
-      payload: { artifactId: artifact.id, data: { ...data, content: draftContent } },
-    });
+    if (onSave) {
+      onSave(draftContent);
+    } else {
+      store.dispatch({
+        type: 'CUSTOM',
+        name: 'chatkit.document.snapshot',
+        payload: { artifactId: artifact.id, data: { ...data, content: draftContent } },
+      });
+    }
     editing = false;
   }
 

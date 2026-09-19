@@ -67,4 +67,52 @@ describe('DevtoolsOverlay', () => {
       expect(screen.getByTestId('devtools-state')).toHaveTextContent('"running"');
     });
   });
+
+  it('starts collapsed, and the toggle expands/collapses it without removing events from the DOM', async () => {
+    const log = createDevtoolsLog();
+    log.record({ type: 'RUN_STARTED', runId: 'r1', threadId: 't1' });
+    const transport = createFixtureTransport([]);
+    render(TestHarness, { config: { transport, threadId: 't1' }, log });
+
+    const toggle = screen.getByTestId('devtools-toggle');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // Collapsed is a CSS state, not removal from the DOM -- existing
+    // automation (this app's own live-verification scripts, the playground
+    // e2e spec) queries devtools-event/devtools-state directly and must
+    // keep working without needing to click expand first.
+    expect(screen.getByTestId('devtools-event')).toBeInTheDocument();
+
+    await fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('devtools-event')).toBeInTheDocument();
+
+    await fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('truncates a very long string value (e.g. a base64 attachment) instead of dumping it in full', () => {
+    const log = createDevtoolsLog();
+    const hugeDataUri = `data:image/png;base64,${'A'.repeat(5000)}`;
+    log.record({
+      type: 'CUSTOM',
+      name: 'chatkit.form.result',
+      payload: { artifactId: 'a1', values: { photo: hugeDataUri } },
+    });
+    const transport = createFixtureTransport([]);
+    render(TestHarness, { config: { transport, threadId: 't1' }, log });
+
+    const eventText = screen.getByTestId('devtools-event').textContent ?? '';
+    expect(eventText.length).toBeLessThan(hugeDataUri.length);
+    expect(eventText).toContain('chars total');
+    expect(eventText).not.toContain('A'.repeat(5000));
+  });
+
+  it('does not truncate ordinary short values', () => {
+    const log = createDevtoolsLog();
+    log.record({ type: 'RUN_STARTED', runId: 'r1', threadId: 't1' });
+    const transport = createFixtureTransport([]);
+    render(TestHarness, { config: { transport, threadId: 't1' }, log });
+
+    expect(screen.getByTestId('devtools-event')).toHaveTextContent('"threadId": "t1"');
+  });
 });

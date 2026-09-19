@@ -24,6 +24,15 @@ export function createChatStore(config: ChatConfig) {
   let state = $state(initialState(config.initialState));
   let currentRunId: string | null = null;
   let disposed = false;
+  // True only while a transport.sendRun() call is itself in flight (from
+  // just before that call to just after it settles). This is deliberately
+  // NOT the same as "a run is open" — a run can stay open for a long time
+  // (e.g. paused on a tool-call approval) during which sending a further,
+  // separate message is legitimate. This flag exists solely to close the
+  // narrow window where two startRun calls issued synchronously (a
+  // same-tick double-submit) would both fire transport.sendRun() before
+  // either has a chance to be seen by the other.
+  let sendRunInFlight = false;
 
   const transport = config.transport;
   const pluginHost = createPluginHost(config.plugins ?? []);
@@ -100,6 +109,17 @@ export function createChatStore(config: ChatConfig) {
   }
 
   async function startRun(partial: Partial<RunAgentInput>) {
+    // Guard on sendRunInFlight, not state.runStatus: runStatus only flips
+    // once a RUN_STARTED event round-trips back through the transport, so
+    // two startRun calls issued synchronously in the same tick (e.g. a
+    // double-submit before any UI has re-rendered) would both see 'idle' and
+    // both go through. sendRunInFlight is set synchronously below, before
+    // any await, so it closes that window and makes "don't fire two
+    // concurrent sendRun() calls" an invariant of the store itself rather
+    // than something every caller (Composer, a custom UI, a plugin) has to
+    // separately get right.
+    if (sendRunInFlight) return;
+    sendRunInFlight = true;
     currentRunId = crypto.randomUUID();
     const input: RunAgentInput = {
       threadId: config.threadId ?? 'default',
@@ -109,11 +129,21 @@ export function createChatStore(config: ChatConfig) {
       state: state.sharedState,
       ...partial,
     };
-    await transport.sendRun(input);
+    try {
+      await transport.sendRun(input);
+    } finally {
+      sendRunInFlight = false;
+    }
   }
 
   async function sendMessage(input: UserInput): Promise<void> {
     const processed = (await pluginHost.runHook('beforeSend', input, ctx)) as UserInput;
+    // Re-checked here (not just inside startRun) so a message that can't
+    // actually be sent never gets appended to the transcript in the first
+    // place — otherwise a caller that races past this point would see its
+    // message appear as "sent" while startRun silently no-ops on it, with no
+    // run ever addressing it.
+    if (sendRunInFlight) return;
     const message: Message = {
       id: crypto.randomUUID(),
       role: 'user',

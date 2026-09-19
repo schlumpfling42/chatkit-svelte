@@ -93,4 +93,129 @@ describe('parseBlocks', () => {
       },
     ]);
   });
+
+  it('parses a heading at each level', () => {
+    expect(parseBlocks('# One')).toEqual([{ type: 'heading', level: 1, children: [{ type: 'text', text: 'One' }] }]);
+    expect(parseBlocks('### Three')).toEqual([{ type: 'heading', level: 3, children: [{ type: 'text', text: 'Three' }] }]);
+  });
+
+  it('parses inline formatting inside a heading', () => {
+    expect(parseBlocks('## **Bold** heading')).toEqual([
+      {
+        type: 'heading',
+        level: 2,
+        children: [{ type: 'bold', children: [{ type: 'text', text: 'Bold' }] }, { type: 'text', text: ' heading' }],
+      },
+    ]);
+  });
+
+  it('does not treat a bare "#" with no following text as a heading', () => {
+    expect(parseBlocks('#nothash')).toEqual([{ type: 'paragraph', children: [{ type: 'text', text: '#nothash' }] }]);
+  });
+
+  it('parses a paragraph immediately followed by a heading with no blank line between', () => {
+    expect(parseBlocks('intro text\n# Heading')).toEqual([
+      { type: 'paragraph', children: [{ type: 'text', text: 'intro text' }] },
+      { type: 'heading', level: 1, children: [{ type: 'text', text: 'Heading' }] },
+    ]);
+  });
+
+  it('parses an unordered list', () => {
+    expect(parseBlocks('- one\n- two\n- three')).toEqual([
+      {
+        type: 'list',
+        ordered: false,
+        items: [[{ type: 'text', text: 'one' }], [{ type: 'text', text: 'two' }], [{ type: 'text', text: 'three' }]],
+      },
+    ]);
+  });
+
+  it('parses an ordered list', () => {
+    expect(parseBlocks('1. first\n2. second')).toEqual([
+      { type: 'list', ordered: true, items: [[{ type: 'text', text: 'first' }], [{ type: 'text', text: 'second' }]] },
+    ]);
+  });
+
+  it('parses inline formatting inside list items', () => {
+    expect(parseBlocks('- **bold** item')).toEqual([
+      {
+        type: 'list',
+        ordered: false,
+        items: [[{ type: 'bold', children: [{ type: 'text', text: 'bold' }] }, { type: 'text', text: ' item' }]],
+      },
+    ]);
+  });
+
+  it('ends a list at the first non-item line', () => {
+    expect(parseBlocks('- one\n- two\n\nafter')).toEqual([
+      { type: 'list', ordered: false, items: [[{ type: 'text', text: 'one' }], [{ type: 'text', text: 'two' }]] },
+      { type: 'paragraph', children: [{ type: 'text', text: 'after' }] },
+    ]);
+  });
+
+  it('parses a GFM table with a header, separator, and data rows', () => {
+    const result = parseBlocks('| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |');
+    expect(result).toEqual([
+      {
+        type: 'table',
+        header: [[{ type: 'text', text: 'A' }], [{ type: 'text', text: 'B' }]],
+        align: [null, null],
+        rows: [
+          [[{ type: 'text', text: '1' }], [{ type: 'text', text: '2' }]],
+          [[{ type: 'text', text: '3' }], [{ type: 'text', text: '4' }]],
+        ],
+      },
+    ]);
+  });
+
+  it('parses column alignment from the separator row', () => {
+    const result = parseBlocks('| L | C | R |\n|:---|:---:|---:|\n| a | b | c |');
+    expect(result).toEqual([
+      {
+        type: 'table',
+        header: [[{ type: 'text', text: 'L' }], [{ type: 'text', text: 'C' }], [{ type: 'text', text: 'R' }]],
+        align: ['left', 'center', 'right'],
+        rows: [[[{ type: 'text', text: 'a' }], [{ type: 'text', text: 'b' }], [{ type: 'text', text: 'c' }]]],
+      },
+    ]);
+  });
+
+  it('parses a table with no leading/trailing pipes', () => {
+    const result = parseBlocks('A | B\n--- | ---\n1 | 2');
+    expect(result).toEqual([
+      {
+        type: 'table',
+        header: [[{ type: 'text', text: 'A' }], [{ type: 'text', text: 'B' }]],
+        align: [null, null],
+        rows: [[[{ type: 'text', text: '1' }], [{ type: 'text', text: '2' }]]],
+      },
+    ]);
+  });
+
+  it('does not treat a lone header-looking row with no confirmed separator as a table yet (streaming safety)', () => {
+    // Mid-stream, the separator line hasn't arrived yet -- must not guess.
+    const result = parseBlocks('| A | B |');
+    expect(result).toEqual([{ type: 'paragraph', children: expect.anything() }]);
+  });
+
+  it('parses a table immediately following a paragraph with no blank line between', () => {
+    const result = parseBlocks('Results:\n| A | B |\n|---|---|\n| 1 | 2 |');
+    expect(result).toEqual([
+      { type: 'paragraph', children: [{ type: 'text', text: 'Results:' }] },
+      {
+        type: 'table',
+        header: [[{ type: 'text', text: 'A' }], [{ type: 'text', text: 'B' }]],
+        align: [null, null],
+        rows: [[[{ type: 'text', text: '1' }], [{ type: 'text', text: '2' }]]],
+      },
+    ]);
+  });
+
+  it('ends a table at the first blank line', () => {
+    const result = parseBlocks('| A |\n|---|\n| 1 |\n\nafter');
+    expect(result).toEqual([
+      { type: 'table', header: [[{ type: 'text', text: 'A' }]], align: [null], rows: [[[{ type: 'text', text: '1' }]]] },
+      { type: 'paragraph', children: [{ type: 'text', text: 'after' }] },
+    ]);
+  });
 });
