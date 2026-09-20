@@ -131,6 +131,16 @@ export function createChatStore(config: ChatConfig) {
     };
     try {
       await transport.sendRun(input);
+    } catch (error) {
+      // The request never reached a running agent (network down, server refused): no events will follow, so without
+      // this the UI would wait forever for an answer that is not coming.
+      if (disposed) return;
+      currentRunId = null;
+      applyEvent({
+        type: 'RUN_ERROR',
+        runId: input.runId,
+        error: { code: 'SEND_FAILED', message: error instanceof Error ? error.message : String(error), recoverable: true },
+      });
     } finally {
       sendRunInFlight = false;
     }

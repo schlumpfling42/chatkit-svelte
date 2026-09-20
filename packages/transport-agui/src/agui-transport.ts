@@ -19,6 +19,43 @@ export interface AguiTransportOptions {
   queueCapacity?: number;
   /** Minimum time (ms) a connection must stay open before a subsequent failure resets the backoff attempt counter to 0. Prevents a "flapping" connection (accepts then immediately drops, repeatedly) from being treated as fresh each time and hammering the server at a constant minimal interval instead of escalating backoff. Default 1000. */
   minStableConnectionMs?: number;
+  /**
+   * SSE only. Ask the server for the session handshake (default true): a `hello` frame naming the server process,
+   * then either the events missed since the last one seen or, if the server cannot resume from there (it restarted,
+   * or this is a fresh page), the whole conversation as a MESSAGES_SNAPSHOT. Servers that do not know the handshake
+   * ignore the extra query parameter and stream events as before.
+   */
+  handshake?: boolean;
+  /**
+   * SSE only. A connection that delivers nothing at all (events or `:keep-alive` comments) for this long is treated
+   * as dead and re-opened: a restarted server, a sleeping laptop or a proxy that lost its upstream can leave a stream
+   * open but silent forever. Keep it well above the server's keep-alive interval (the chatkit gateway sends one every
+   * 15 s). Default 45000; 0 turns it off.
+   */
+  idleTimeoutMs?: number;
+  /**
+   * SSE only. After the server accepts a run, the event stream must deliver something within this long, or it is
+   * treated as dead and replaced at once (see idleTimeoutMs for the slower general case). Default 3000; 0 turns it off.
+   */
+  runAckTimeoutMs?: number;
+  /** Called whenever the event stream's state changes, so a UI can say "Reconnecting…". */
+  onConnectionChange?: (state: ConnectionState) => void;
+  /** Called with each `hello` the server sends (SSE handshake). */
+  onSession?: (hello: SessionHello) => void;
+}
+
+/** Where the event stream is: `stale` is a connection that went silent and is being replaced. */
+export type ConnectionState = 'connecting' | 'live' | 'stale' | 'reconnecting' | 'closed';
+
+/** What the server says about itself and the thread when a stream opens. */
+export interface SessionHello {
+  /** Names the server process; a different one than last time means the server restarted. */
+  instanceId: string;
+  /** `resume`: only missed events follow. `snapshot`: the conversation follows (if the server has one). */
+  mode: 'resume' | 'snapshot';
+  threadKnown: boolean;
+  events: number;
+  runActive: boolean;
 }
 
 interface StateMirrorRef {
@@ -43,6 +80,21 @@ export function createAguiTransport(options: AguiTransportOptions): ChatTranspor
   let disposed = false;
   let activeAbortController: AbortController | null = null;
   let activeWebSocket: WebSocket | null = null;
+  let connectionState: ConnectionState | undefined;
+  // When the event stream last delivered anything at all, and a handle to replace the stream that is open now (SSE).
+  // A run that the server accepted should be answered on the stream within moments; these let sendRun check.
+  let lastBytesAt = Date.now();
+  let currentConnection: { replace: () => void } | null = null;
+
+  function setConnection(next: ConnectionState): void {
+    if (next === connectionState) return;
+    connectionState = next;
+    try {
+      options.onConnectionChange?.(next);
+    } catch {
+      // a broken listener must not break the stream
+    }
+  }
 
   async function requestFreshSnapshot(threadId: string): Promise<unknown> {
     const response = await fetchImpl(`${options.endpoint}/threads/${encodeURIComponent(threadId)}/state`, {
@@ -78,21 +130,57 @@ export function createAguiTransport(options: AguiTransportOptions): ChatTranspor
 
   async function* connectViaSse(session: { threadId: string; resumeToken?: string }): AsyncGenerator<ChatEvent> {
     let resumeToken = session.resumeToken;
+    // Which server process this position belongs to. Sent back on every reconnect; if the server answers with a
+    // different one, it restarted and the position is void (the server then sends the whole conversation).
+    let instanceId: string | undefined;
     let attempt = 0;
+    let everConnected = false;
     const mirror: StateMirrorRef = { value: undefined };
     const minStableMs = options.minStableConnectionMs ?? 1000;
+    const idleMs = options.idleTimeoutMs ?? 45_000;
+    const handshake = options.handshake ?? true;
 
     while (!disposed) {
-      activeAbortController = new AbortController();
+      const controller = new AbortController();
+      activeAbortController = controller;
+      setConnection(everConnected ? 'reconnecting' : 'connecting');
       const url = new URL(`${options.endpoint}/threads/${encodeURIComponent(session.threadId)}/events`, urlBase());
+      if (handshake) url.searchParams.set('instance', instanceId ?? '');
       if (resumeToken) url.searchParams.set('resumeToken', resumeToken);
       const connectStartedAt = Date.now();
 
       let connectedOk = false;
+      // The watchdog is re-armed before every wait, and any bytes at all (a keep-alive comment included) satisfy it.
+      let stale = false;
+      let thisConnection: { replace: () => void } | null = null;
+      let idleTimer: ReturnType<typeof setTimeout> | undefined;
+      const armIdle = () => {
+        clearTimeout(idleTimer);
+        if (idleMs > 0) {
+          idleTimer = setTimeout(() => {
+            stale = true;
+            controller.abort();
+          }, idleMs);
+        }
+      };
       try {
-        const response = await fetchImpl(url.toString(), { signal: activeAbortController.signal });
+        armIdle();
+        const response = await fetchImpl(url.toString(), { signal: controller.signal });
+        // An error page is not a stream: without this, a 500 reads as an empty "clean close" and is retried in a
+        // tight loop with no backoff.
+        if (response.ok === false) throw new Error(`AG-UI SSE connection refused (HTTP ${response.status})`);
         if (!response.body) throw new Error('AG-UI SSE response has no body');
         connectedOk = true;
+        everConnected = true;
+        lastBytesAt = Date.now();
+        thisConnection = {
+          replace: () => {
+            stale = true;
+            controller.abort();
+          },
+        };
+        currentConnection = thisConnection;
+        setConnection('live');
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -100,10 +188,25 @@ export function createAguiTransport(options: AguiTransportOptions): ChatTranspor
         const queue = new BoundedEventQueue(options.queueCapacity ?? 500);
 
         while (true) {
+          armIdle();
           const { done, value } = await reader.read();
           if (done) break;
+          lastBytesAt = Date.now();
           const chunk = decoder.decode(value, { stream: true });
           for (const frame of parser.push(chunk)) {
+            if (frame.event === 'hello') {
+              try {
+                const hello = JSON.parse(frame.data) as SessionHello;
+                instanceId = hello.instanceId;
+                // A snapshot means the position we held meant nothing to this server; the snapshot frame carries the
+                // position to continue from.
+                if (hello.mode === 'snapshot') resumeToken = undefined;
+                options.onSession?.(hello);
+              } catch {
+                // a hello we cannot read is not worth breaking the stream over
+              }
+              continue;
+            }
             if (frame.id) resumeToken = frame.id;
             let event: ChatEvent;
             try {
@@ -123,9 +226,20 @@ export function createAguiTransport(options: AguiTransportOptions): ChatTranspor
         }
       } catch {
         connectedOk = false;
+      } finally {
+        clearTimeout(idleTimer);
+        if (currentConnection === thisConnection) currentConnection = null;
       }
 
       if (disposed) return;
+
+      if (stale) {
+        // Silent for too long: replace the connection at once. If the server really is gone the next attempt fails
+        // and the usual backoff takes over.
+        setConnection('stale');
+        attempt = 0;
+        continue;
+      }
 
       // Reset the backoff counter on a clean close, or on a connection that
       // survived long enough to be considered healthy before it failed.
@@ -234,11 +348,27 @@ export function createAguiTransport(options: AguiTransportOptions): ChatTranspor
   }
 
   async function sendRun(input: RunAgentInput): Promise<void> {
-    await fetchImpl(`${options.endpoint}/runs`, {
+    const response = await fetchImpl(`${options.endpoint}/runs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
       body: JSON.stringify(input),
     });
+    // The event stream is where a run's outcome arrives, but a refused request never starts one: say so.
+    if (response.ok === false) throw new Error(`Could not start the run (HTTP ${response.status})`);
+
+    // The run was accepted, so a live server is about to write to the stream (the first event follows within
+    // milliseconds). If nothing at all has arrived a few seconds on, the stream is dead even if nothing said so (a
+    // restarted server behind a proxy that never passed the close on): replace it now rather than waiting for the
+    // idle watchdog. The new stream is sent whatever the old one missed.
+    const ackMs = options.runAckTimeoutMs ?? 3000;
+    const connection = currentConnection;
+    if (ackMs > 0 && connection) {
+      const acceptedAt = Date.now();
+      setTimeout(() => {
+        if (disposed || currentConnection !== connection) return;
+        if (lastBytesAt < acceptedAt) connection.replace();
+      }, ackMs);
+    }
   }
 
   async function sendFrontendToolResult(result: ToolResult): Promise<void> {
@@ -265,6 +395,7 @@ export function createAguiTransport(options: AguiTransportOptions): ChatTranspor
 
   function dispose(): void {
     disposed = true;
+    setConnection('closed');
     activeAbortController?.abort();
     activeWebSocket?.close();
   }

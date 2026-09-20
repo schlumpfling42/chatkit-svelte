@@ -96,6 +96,32 @@ describe('createChatStore', () => {
     store.dispose();
   });
 
+  it('shows a run that could not be started as a recoverable error instead of doing nothing', async () => {
+    const refusingTransport = {
+      connect: async function* () {},
+      sendRun: vi.fn(async () => {
+        throw new Error('Could not start the run (HTTP 500)');
+      }),
+      sendFrontendToolResult: vi.fn(async () => {}),
+      abortRun: vi.fn(async () => {}),
+      dispose: vi.fn(),
+    };
+    const store = createChatStore({ transport: refusingTransport, threadId: 't1' });
+
+    await store.sendMessage({ text: 'hello' });
+
+    expect(store.runStatus).toBe('error');
+    expect(store.state.error).toMatchObject({ code: 'SEND_FAILED', message: 'Could not start the run (HTTP 500)', recoverable: true });
+    expect(store.messages).toHaveLength(1); // what the user typed stays
+
+    // and the store is usable again: a later message is sent, not swallowed by a stuck "in flight" flag
+    refusingTransport.sendRun.mockImplementationOnce(async () => {});
+    await store.sendMessage({ text: 'again' });
+    expect(refusingTransport.sendRun).toHaveBeenCalledTimes(2);
+
+    store.dispose();
+  });
+
   it('stops applying events once dispose() has been called', async () => {
     const events: ChatEvent[] = [
       { type: 'TEXT_MESSAGE_START', messageId: 'm1', role: 'assistant' },

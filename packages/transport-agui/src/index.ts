@@ -1,5 +1,5 @@
 export { createAguiTransport } from './agui-transport';
-export type { AguiTransportOptions } from './agui-transport';
+export type { AguiTransportOptions, ConnectionState, SessionHello } from './agui-transport';
 export { createSseFrameParser } from './sse-parser';
 export type { SseFrame, SseFrameParser } from './sse-parser';
 export { computeBackoffDelay } from './backoff';
