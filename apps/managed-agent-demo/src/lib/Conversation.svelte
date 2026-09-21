@@ -4,7 +4,6 @@
   import { ChatWindow } from '@chatkit-svelte/ui';
   import { createAguiTransport } from '@chatkit-svelte/transport-agui';
   import type { ConnectionState } from '@chatkit-svelte/transport-agui';
-  import { toolRenderPlugin } from '@chatkit-svelte/plugin-tool-render';
   import { markdownPlugin } from '@chatkit-svelte/plugin-markdown';
   import { fileHandlingPlugin, requestFileToolDefinition } from '@chatkit-svelte/plugin-file-handling';
   import { formsPlugin, showFormToolDefinition } from '@chatkit-svelte/plugin-forms';
@@ -12,7 +11,7 @@
   import { devtoolsPlugin, DevtoolsOverlay } from '@chatkit-svelte/plugin-devtools';
   import type { ChatConfig } from '@chatkit-svelte/core';
   import { rememberThread } from './threads';
-  import DirectoryTreeRenderer from './DirectoryTreeRenderer.svelte';
+  import TransientToolCall from './TransientToolCall.svelte';
 
   // One conversation. The page keys this component on the thread id, so opening another conversation builds a whole
   // new store and transport rather than reusing one.
@@ -138,8 +137,7 @@
     // renders its UI, and the run resumes once the answer comes back.
     tools: [showFormToolDefinition, requestFileToolDefinition, createDocumentToolDefinition],
     plugins: [
-      toolRenderPlugin(),
-      { name: 'directory-tree', version: '1.0.0', toolRenderers: { list_directory: DirectoryTreeRenderer } },
+      { name: 'transient-tool-calls', version: '1.0.0', toolRenderers: { '*': TransientToolCall } },
       markdownPlugin(),
       fileHandlingPlugin({ upload: async (file) => ({ url: await readAsDataUrl(file) }) }),
       formsPlugin(),

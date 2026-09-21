@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { ContentPart } from '@chatkit-svelte/core';
-  import { ToolCallCard } from '@chatkit-svelte/plugin-tool-render';
   import { drawTree, parseDrawn, parseListing } from './directory-tree';
 
   interface Props {
@@ -14,20 +13,16 @@
   const lines = $derived(parsed ? (parsed.drawn ?? drawTree(parsed.root)) : []);
 </script>
 
-<!-- A recursive listing is drawn as a tree; anything else (an ordinary listing, an error, a later page) keeps the plain card. -->
+<!-- A recursive listing, drawn as a tree. It is the content of the answer, so it carries no tool name or status;
+     anything that is not a recursive listing draws nothing. -->
 {#if parsed}
   <details class="dir-tree" open data-testid="directory-tree">
-    <summary class="dir-tree__summary">
-      <span class="dir-tree__name">{toolCall.toolName}</span>
-      <span class="dir-tree__header">{parsed.header}</span>
-    </summary>
+    <summary class="dir-tree__header">{parsed.header}</summary>
     <pre class="dir-tree__body">{lines.join('\n')}</pre>
     {#each parsed.notes as note}
       <p class="dir-tree__note">{note}</p>
     {/each}
   </details>
-{:else}
-  <ToolCallCard {toolCall} />
 {/if}
 
 <style>
@@ -38,14 +33,9 @@
     font-size: var(--ck-font-size-sm);
   }
 
-  .dir-tree__summary {
-    display: flex;
-    gap: var(--ck-space-2);
+  .dir-tree__header {
     cursor: pointer;
     font-family: var(--ck-font-mono);
-  }
-
-  .dir-tree__header {
     color: var(--ck-color-text-muted);
   }
 

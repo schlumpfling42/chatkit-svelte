@@ -223,6 +223,12 @@
     max-width: 80%;
   }
 
+  /* An assistant message whose parts all render nothing (a tool call a renderer chose not to show, an empty text) would
+     be an empty bubble: leave it out. Anything a renderer draws is an element other than an empty markdown block. */
+  .ck-message--assistant:not(:has(> :global(:not(.ck-markdown:empty)))) {
+    display: none;
+  }
+
   .ck-tool-call-fallback {
     font-size: var(--ck-font-size-sm);
     color: var(--ck-color-text-muted);
