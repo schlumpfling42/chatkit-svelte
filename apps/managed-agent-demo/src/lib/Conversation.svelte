@@ -12,6 +12,7 @@
   import type { ChatConfig } from '@chatkit-svelte/core';
   import { rememberThread } from './threads';
   import TransientToolCall from './TransientToolCall.svelte';
+  import PermissionBar from './PermissionBar.svelte';
 
   // One conversation. The page keys this component on the thread id, so opening another conversation builds a whole
   // new store and transport rather than reusing one.
@@ -163,6 +164,7 @@
   <ChatProvider {config}>
     {#snippet children()}
       <div class="demo__window">
+        <PermissionBar />
         <ChatWindow />
       </div>
       <div class="demo__devtools">

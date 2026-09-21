@@ -41,3 +41,31 @@ export function progressOf(activities: ReadonlyArray<{ messageId: string; data: 
   if (!data || typeof data.done !== 'number' || typeof data.total !== 'number' || data.total <= 0) return null;
   return { done: data.done, total: data.total, label: typeof data.label === 'string' ? data.label : '', elapsedSeconds: typeof data.elapsedSeconds === 'number' ? data.elapsedSeconds : 0 };
 }
+
+/** A question the gateway is waiting for the user to answer: a tool wants to read or write outside the trusted folders. */
+export interface PermissionQuestion {
+  id: string;
+  operation: 'read' | 'write';
+  path: string;
+  scope: string;
+  canAlwaysTrust: boolean;
+  tool: string;
+}
+
+/** The questions that have not been answered yet, oldest first. Answered ones stay in the list marked resolved and are left out. */
+export function pendingQuestions(activities: ReadonlyArray<{ messageId: string; data: unknown }>): PermissionQuestion[] {
+  const questions: PermissionQuestion[] = [];
+  for (const activity of activities) {
+    const data = activity.data as Record<string, unknown> | null | undefined;
+    if (!data || data.kind !== 'permission' || data.resolved === true || typeof data.id !== 'string') continue;
+    questions.push({
+      id: data.id,
+      operation: data.operation === 'write' ? 'write' : 'read',
+      path: typeof data.path === 'string' ? data.path : '',
+      scope: typeof data.scope === 'string' ? data.scope : '',
+      canAlwaysTrust: data.canAlwaysTrust === true,
+      tool: typeof data.tool === 'string' ? data.tool : '',
+    });
+  }
+  return questions;
+}

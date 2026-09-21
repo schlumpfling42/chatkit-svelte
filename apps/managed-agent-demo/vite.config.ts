@@ -42,12 +42,16 @@ export default defineConfig(({ mode }) => {
   // instead of answering from this app's own SvelteKit routes. The browser still talks to one origin, so there
   // is no CORS to configure and the gateway itself can stay on loopback (reach it through an SSH tunnel).
   const gatewayUrl = process.env.GATEWAY_URL?.trim();
+  // The gateway checks a key on every request. The dev server adds it here, so the browser never holds it.
+  const gatewayKey = process.env.GATEWAY_API_KEY?.trim();
 
   return {
     plugins: [sveltekit()],
     server: {
       port: 5181,
-      proxy: gatewayUrl ? { '/api/agent': { target: gatewayUrl, changeOrigin: true } } : undefined,
+      proxy: gatewayUrl
+        ? { '/api/agent': { target: gatewayUrl, changeOrigin: true, headers: gatewayKey ? { Authorization: `Bearer ${gatewayKey}` } : undefined } }
+        : undefined,
     },
     optimizeDeps: {
       exclude: CHATKIT_PACKAGES,

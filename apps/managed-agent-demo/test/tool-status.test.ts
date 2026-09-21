@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ToolCallStatus } from '@chatkit-svelte/core';
-import { OUTPUT_TOOLS, callLabel, isFinished, progressOf } from '../src/lib/tool-status';
+import { OUTPUT_TOOLS, callLabel, isFinished, pendingQuestions, progressOf } from '../src/lib/tool-status';
 
 describe('isFinished', () => {
   it('a call that is still being prepared or run is not finished', () => {
@@ -56,5 +56,37 @@ describe('progressOf', () => {
     expect(progressOf(activities, 'call-2')).toBeNull();
     expect(progressOf(activities, 'call-3')).toBeNull();
     expect(progressOf([], 'call-1')).toBeNull();
+  });
+});
+
+describe('pendingQuestions', () => {
+  const asked = { kind: 'permission', id: 'p1', operation: 'read', path: '/etc/hosts', scope: '/etc', canAlwaysTrust: true, tool: 'read_file', resolved: false };
+
+  it('lists a question nobody has answered', () => {
+    expect(pendingQuestions([{ messageId: 'permission:p1', data: asked }])).toEqual([
+      { id: 'p1', operation: 'read', path: '/etc/hosts', scope: '/etc', canAlwaysTrust: true, tool: 'read_file' },
+    ]);
+  });
+
+  it('drops a question once it is marked answered, whichever answer it was', () => {
+    expect(pendingQuestions([{ messageId: 'permission:p1', data: { ...asked, resolved: true, decision: 'deny' } }])).toEqual([]);
+  });
+
+  it('ignores progress bars and anything else on the activity list, and keeps the order', () => {
+    const activities = [
+      { messageId: 'call-1', data: { done: 1, total: 3, label: 'a' } },
+      { messageId: 'permission:p2', data: { ...asked, id: 'p2', operation: 'write', path: '/srv/x', canAlwaysTrust: false } },
+      { messageId: 'x', data: 'not an object' },
+      { messageId: 'permission:p1', data: asked },
+    ];
+
+    expect(pendingQuestions(activities).map((q) => `${q.id}:${q.operation}:${q.canAlwaysTrust}`)).toEqual(['p2:write:false', 'p1:read:true']);
+  });
+
+  it('is empty for no activities, and treats missing fields as empty rather than failing', () => {
+    expect(pendingQuestions([])).toEqual([]);
+    expect(pendingQuestions([{ messageId: 'permission:q', data: { kind: 'permission', id: 'q' } }])).toEqual([
+      { id: 'q', operation: 'read', path: '', scope: '', canAlwaysTrust: false, tool: '' },
+    ]);
   });
 });
